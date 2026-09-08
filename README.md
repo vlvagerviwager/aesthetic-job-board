@@ -1,8 +1,10 @@
-# aesthetic-job-board
+# Aesthetic Job Board
 
 A front facing job board that pulls in roles I care about in an aesthetic pastel UI. It aggregates Irish Publicjobs and Activelink listings, always shows the most recently posted jobs first, and lets me hide roles, filter by hidden state, filter by location, search by keyword, and filter by remote, hybrid, or on site work mode.
 
 ![Screenshot of the aesthetic job board](docs/aesthetic-job-board.png)
+
+This was created for personal use. 
 
 ## How to run locally
 
