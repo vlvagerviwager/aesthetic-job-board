@@ -9,6 +9,7 @@ import {
   isEffectivelyHidden,
   matchesFilters,
   sortNewestFirst,
+  titleMentionsOrganisation,
 } from "./filters";
 import {
   applyTheme,
@@ -180,19 +181,11 @@ function renderJobs(restoreFocusJobId?: string): void {
       metaRow.appendChild(createTag("hidden", "tag-hidden"));
     }
 
-    const orgLine = document.createElement("p");
-    orgLine.className = "job-summary";
-    orgLine.textContent = job.organisation;
-
     const locationLine = document.createElement("p");
     locationLine.className = "job-summary";
     locationLine.textContent = `Location: ${job.locationRaw}`;
 
     const hasSalary = job.salary.trim().length > 0;
-
-    const summaryLine = document.createElement("p");
-    summaryLine.className = "job-summary";
-    summaryLine.textContent = job.summary;
 
     const datesLine = document.createElement("div");
     datesLine.className = "job-dates";
@@ -230,16 +223,18 @@ function renderJobs(restoreFocusJobId?: string): void {
 
     bodyElement.appendChild(titleHeading);
     bodyElement.appendChild(metaRow);
-    bodyElement.appendChild(orgLine);
+    if (titleMentionsOrganisation(job) === false) {
+      const orgLine = document.createElement("p");
+      orgLine.className = "job-summary";
+      orgLine.textContent = job.organisation;
+      bodyElement.appendChild(orgLine);
+    }
     bodyElement.appendChild(locationLine);
     if (hasSalary) {
       const salaryLine = document.createElement("p");
       salaryLine.className = "job-salary";
       salaryLine.textContent = `Salary: ${job.salary.trim()}`;
       bodyElement.appendChild(salaryLine);
-    }
-    if (job.summary.trim().length > 0) {
-      bodyElement.appendChild(summaryLine);
     }
     bodyElement.appendChild(datesLine);
     bodyElement.appendChild(actionsRow);

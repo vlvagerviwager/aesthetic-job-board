@@ -16,6 +16,12 @@ export function isEffectivelyHidden(job: JobListing, overrides: Record<string, b
   return job.hidden;
 }
 
+export function titleMentionsOrganisation(job: JobListing): boolean {
+  const titleText = normalizeSearchText(job.title);
+  const organisationText = normalizeSearchText(job.organisation);
+  return organisationText !== "" && titleText.startsWith(organisationText);
+}
+
 export function matchesKeyword(job: JobListing, keywordRaw: string): boolean {
   const trimmedKeyword = keywordRaw.trim();
   if (trimmedKeyword.length < KEYWORD_MIN_LENGTH) {

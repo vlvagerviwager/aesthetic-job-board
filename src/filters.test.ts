@@ -5,6 +5,7 @@ import {
   matchesLocation,
   normalizeSearchText,
   sortNewestFirst,
+  titleMentionsOrganisation,
 } from "./filters";
 import type { JobListing } from "./types";
 
@@ -71,6 +72,22 @@ describe("isEffectivelyHidden", () => {
 
   test("falls back to stored flag", () => {
     expect(isEffectivelyHidden(makeJob({ hidden: true }), {})).toBe(true);
+  });
+});
+
+describe("titleMentionsOrganisation", () => {
+  test("detects org prefix despite accents and case", () => {
+    expect(
+      titleMentionsOrganisation(makeJob({ title: "Foróige: Club Development Officer" })),
+    ).toBe(true);
+  });
+
+  test("returns false when the title stands alone", () => {
+    expect(
+      titleMentionsOrganisation(
+        makeJob({ title: "Laboratory Manager", organisation: "Department of Agriculture" }),
+      ),
+    ).toBe(false);
   });
 });
 
