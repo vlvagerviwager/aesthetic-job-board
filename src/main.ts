@@ -1,11 +1,15 @@
 import {
   DATA_URL,
   DEFAULT_LOCATIONS,
-  KEYWORD_MIN_LENGTH,
   LOCATION_OPTIONS,
   THEME_DARK,
   THEME_LIGHT,
 } from "./constants";
+import {
+  isEffectivelyHidden,
+  matchesFilters,
+  sortNewestFirst,
+} from "./filters";
 import {
   applyTheme,
   getInitialTheme,
@@ -37,13 +41,18 @@ interface BoardState {
   generatedAt: string;
   filters: BoardFilters;
   hiddenOverrides: Record<string, boolean>;
+  visibleCount: number;
 }
+
+const RENDER_PAGE_SIZE = 60;
+const KEYWORD_DEBOUNCE_MS = 150;
 
 const boardState: BoardState = {
   allJobs: [],
   generatedAt: "",
   filters: readStoredFilters(DEFAULT_FILTERS),
   hiddenOverrides: readHiddenOverrides(),
+  visibleCount: RENDER_PAGE_SIZE,
 };
 
 function getElementByIdOrThrow(elementId: string): HTMLElement {
@@ -52,69 +61,6 @@ function getElementByIdOrThrow(elementId: string): HTMLElement {
     throw new Error(`Missing required element: ${elementId}`);
   }
   return foundElement;
-}
-
-function isEffectivelyHidden(job: JobListing, overrides: Record<string, boolean>): boolean {
-  const overrideValue = overrides[job.id];
-  if (typeof overrideValue === "boolean") {
-    return overrideValue;
-  }
-  return job.hidden;
-}
-
-function matchesKeyword(job: JobListing, keywordRaw: string): boolean {
-  const trimmedKeyword = keywordRaw.trim().toLowerCase();
-  if (trimmedKeyword.length < KEYWORD_MIN_LENGTH) {
-    return true;
-  }
-  const haystack = `${job.title} ${job.organisation} ${job.summary} ${job.locationRaw} ${job.salary}`.toLowerCase();
-  return haystack.includes(trimmedKeyword);
-}
-
-function matchesLocation(job: JobListing, selectedLocations: string[]): boolean {
-  if (selectedLocations.length === 0) {
-    return true;
-  }
-  const locationLower = job.locationRaw.toLowerCase();
-  for (const selectedLocation of selectedLocations) {
-    if (locationLower.includes(selectedLocation.toLowerCase())) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function matchesFilters(job: JobListing, filters: BoardFilters, overrides: Record<string, boolean>): boolean {
-  const effectiveHidden = isEffectivelyHidden(job, overrides);
-  if (filters.hidden === "active" && effectiveHidden) {
-    return false;
-  }
-  if (filters.hidden === "hidden" && effectiveHidden === false) {
-    return false;
-  }
-  if (filters.source !== "all" && job.source !== filters.source) {
-    return false;
-  }
-  if (filters.workMode !== "all" && job.workMode !== filters.workMode) {
-    return false;
-  }
-  if (matchesLocation(job, filters.locations) === false) {
-    return false;
-  }
-  if (matchesKeyword(job, filters.keyword) === false) {
-    return false;
-  }
-  return true;
-}
-
-function sortNewestFirst(jobList: JobListing[]): JobListing[] {
-  const sortedJobs = [...jobList];
-  sortedJobs.sort((firstJob, secondJob) => {
-    const firstTime = Date.parse(firstJob.postedDate);
-    const secondTime = Date.parse(secondJob.postedDate);
-    return secondTime - firstTime;
-  });
-  return sortedJobs;
 }
 
 function formatDate(dateIso: string): string {
@@ -167,15 +113,20 @@ function createTag(tagText: string, tagClass: string): HTMLSpanElement {
   return tagElement;
 }
 
-function renderJobs(): void {
+function renderJobs(restoreFocusJobId?: string): void {
   const jobListContainer = getElementByIdOrThrow("jobList");
   const resultMeta = getElementByIdOrThrow("resultMeta");
   const filteredJobs = boardState.allJobs.filter((job) =>
     matchesFilters(job, boardState.filters, boardState.hiddenOverrides),
   );
   const sortedJobs = sortNewestFirst(filteredJobs);
+  const visibleJobs = sortedJobs.slice(0, boardState.visibleCount);
+  const remainingCount = sortedJobs.length - visibleJobs.length;
 
-  resultMeta.textContent = `showing ${sortedJobs.length} of ${boardState.allJobs.length} roles, newest first`;
+  resultMeta.textContent =
+    remainingCount > 0
+      ? `showing ${visibleJobs.length} of ${sortedJobs.length} roles (${boardState.allJobs.length} total), newest first`
+      : `showing ${sortedJobs.length} of ${boardState.allJobs.length} roles, newest first`;
   jobListContainer.innerHTML = "";
 
   if (sortedJobs.length === 0) {
@@ -191,7 +142,7 @@ function renderJobs(): void {
     return;
   }
 
-  for (const job of sortedJobs) {
+  for (const job of visibleJobs) {
     const effectiveHidden = isEffectivelyHidden(job, boardState.hiddenOverrides);
     const cardElement = document.createElement("article");
     cardElement.className = `window job-card${effectiveHidden ? " is-hidden-job" : ""}${
@@ -264,6 +215,7 @@ function renderJobs(): void {
     hideButton.type = "button";
     hideButton.className = "retro-button";
     hideButton.textContent = effectiveHidden ? "unhide" : "hide";
+    hideButton.dataset.hideJobId = job.id;
     hideButton.addEventListener("click", () => {
       const nextOverrides: Record<string, boolean> = {
         ...boardState.hiddenOverrides,
@@ -271,7 +223,7 @@ function renderJobs(): void {
       };
       boardState.hiddenOverrides = nextOverrides;
       writeHiddenOverrides(nextOverrides);
-      renderJobs();
+      renderJobs(job.id);
     });
     actionsRow.appendChild(applyLink);
     actionsRow.appendChild(hideButton);
@@ -296,10 +248,37 @@ function renderJobs(): void {
     cardElement.appendChild(bodyElement);
     jobListContainer.appendChild(cardElement);
   }
+
+  if (remainingCount > 0) {
+    const showMoreButton = document.createElement("button");
+    showMoreButton.type = "button";
+    showMoreButton.id = "showMoreJobs";
+    showMoreButton.className = "retro-button";
+    showMoreButton.textContent = `show ${Math.min(remainingCount, RENDER_PAGE_SIZE)} more roles (${remainingCount} remaining)`;
+    showMoreButton.addEventListener("click", () => {
+      boardState.visibleCount += RENDER_PAGE_SIZE;
+      renderJobs();
+      getElementByIdOrThrow("showMoreJobs").focus();
+    });
+    jobListContainer.appendChild(showMoreButton);
+  }
+
+  if (restoreFocusJobId !== undefined) {
+    const nextFocus = jobListContainer.querySelector<HTMLElement>(
+      `[data-hide-job-id="${restoreFocusJobId}"]`,
+    );
+    if (nextFocus !== null) {
+      nextFocus.focus();
+    } else {
+      const firstHideButton = jobListContainer.querySelector<HTMLElement>("[data-hide-job-id]");
+      firstHideButton?.focus();
+    }
+  }
 }
 
 function persistFiltersAndRender(): void {
   writeStoredFilters(boardState.filters);
+  boardState.visibleCount = RENDER_PAGE_SIZE;
   renderJobs();
 }
 
@@ -315,9 +294,13 @@ function bindFilterControls(): void {
   workModeSelect.value = boardState.filters.workMode;
   hiddenSelect.value = boardState.filters.hidden;
 
+  let keywordDebounceHandle = 0;
   keywordInput.addEventListener("input", () => {
-    boardState.filters.keyword = keywordInput.value;
-    persistFiltersAndRender();
+    window.clearTimeout(keywordDebounceHandle);
+    keywordDebounceHandle = window.setTimeout(() => {
+      boardState.filters.keyword = keywordInput.value;
+      persistFiltersAndRender();
+    }, KEYWORD_DEBOUNCE_MS);
   });
   sourceSelect.addEventListener("change", () => {
     boardState.filters.source = sourceSelect.value as SourceFilter;
@@ -368,7 +351,7 @@ function bindThemeToggle(): void {
 async function loadJobs(): Promise<void> {
   const buildMeta = getElementByIdOrThrow("buildMeta");
   try {
-    const response = await fetch(DATA_URL);
+    const response = await fetch(DATA_URL, { cache: "no-store" });
     if (response.ok === false) {
       throw new Error(`jobs fetch failed with status ${response.status}`);
     }

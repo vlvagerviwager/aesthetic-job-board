@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "jobs:fetch": "bun scripts/fetch-jobs.ts",
     "jobs:hide": "bun scripts/toggle-hidden.ts",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {},

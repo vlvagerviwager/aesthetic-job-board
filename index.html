@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vlvagerviwager jobs board</title>
     <meta name="description" content="A board for publicjobs and activelink roles, newest first." />
+    <meta name="theme-color" content="#8f9fe6" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <noscript><p class="noscript-message">This job board needs JavaScript to filter and display roles.</p></noscript>
     <div class="page-grid" aria-hidden="true"></div>
     <main class="page">
       <header class="window hero">
@@ -28,7 +30,7 @@
       </header>
 
       <section class="window filters" aria-label="Job filters">
-        <div class="titlebar titlebar-lavender">
+        <div class="titlebar titlebar-accent">
           <p class="titlebar-text">filters</p>
           <button id="clearFilters" class="retro-button small" type="button">reset all</button>
         </div>
@@ -72,7 +74,7 @@
         </div>
       </section>
 
-      <section id="jobList" class="job-list" aria-live="polite" aria-label="Job listings"></section>
+      <section id="jobList" class="job-list" aria-label="Job listings"></section>
 
       <footer class="window footer">
         <div class="footer-body">

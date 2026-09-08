@@ -115,6 +115,7 @@ body {
   color: var(--color-ink);
 }
 
+.titlebar-accent,
 .titlebar-lavender {
   background: var(--color-yellow);
 }
@@ -123,6 +124,7 @@ body {
   background: var(--color-pink-pale);
 }
 
+[data-theme="dark"] .titlebar-accent,
 [data-theme="dark"] .titlebar-lavender {
   background: var(--color-lavender);
 }
@@ -151,7 +153,6 @@ body {
 .dot-peach { background: var(--color-yellow); }
 .dot-mint { background: var(--color-navy); }
 
-[data-theme="dark"] .dot-peach { background: var(--color-yellow); }
 [data-theme="dark"] .dot-mint { background: var(--color-yellow); }
 
 .hero-body,
@@ -455,9 +456,21 @@ code {
   background: var(--color-peach-soft);
 }
 
-[data-theme="dark"] .footer.window {
-  background: var(--color-card);
-  border-style: dashed;
+#showMoreJobs {
+  align-self: center;
+  padding: 9px 20px;
+}
+
+.noscript-message {
+  max-width: 960px;
+  margin: var(--space-md) auto;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-yellow);
+  color: #000;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 10px;
+  font-weight: var(--weight-button);
+  text-align: center;
 }
 
 ::selection {
