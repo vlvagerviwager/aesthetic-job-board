@@ -35,6 +35,8 @@ const DEFAULT_FILTERS: BoardFilters = {
   locations: [...DEFAULT_LOCATIONS],
   workMode: "all",
   hidden: "active",
+  salaryMin: null,
+  salaryMax: null,
 };
 
 interface BoardState {
@@ -136,7 +138,7 @@ function renderJobs(restoreFocusJobId?: string): void {
     const emptyTitle = document.createElement("h2");
     emptyTitle.textContent = "nothing matches those filters";
     const emptyHint = document.createElement("p");
-    emptyHint.textContent = "Try clearing the keyword, adding more locations, or including hidden roles.";
+    emptyHint.textContent = "Try clearing the keyword, widening the salary range, adding more locations, or including hidden roles.";
     emptyCard.appendChild(emptyTitle);
     emptyCard.appendChild(emptyHint);
     jobListContainer.appendChild(emptyCard);
@@ -271,6 +273,22 @@ function renderJobs(restoreFocusJobId?: string): void {
   }
 }
 
+function readSalaryInput(inputElement: HTMLInputElement): number | null {
+  const trimmedValue = inputElement.value.trim();
+  if (trimmedValue === "") {
+    return null;
+  }
+  const parsedValue = Number(trimmedValue);
+  if (Number.isFinite(parsedValue) === false || parsedValue < 0) {
+    return null;
+  }
+  return Math.floor(parsedValue);
+}
+
+function syncSalaryInput(inputElement: HTMLInputElement, boundValue: number | null): void {
+  inputElement.value = boundValue === null ? "" : String(boundValue);
+}
+
 function persistFiltersAndRender(): void {
   writeStoredFilters(boardState.filters);
   boardState.visibleCount = RENDER_PAGE_SIZE;
@@ -282,12 +300,16 @@ function bindFilterControls(): void {
   const sourceSelect = getElementByIdOrThrow("sourceSelect") as HTMLSelectElement;
   const workModeSelect = getElementByIdOrThrow("workModeSelect") as HTMLSelectElement;
   const hiddenSelect = getElementByIdOrThrow("hiddenSelect") as HTMLSelectElement;
+  const salaryMinInput = getElementByIdOrThrow("salaryMinInput") as HTMLInputElement;
+  const salaryMaxInput = getElementByIdOrThrow("salaryMaxInput") as HTMLInputElement;
   const clearButton = getElementByIdOrThrow("clearFilters") as HTMLButtonElement;
 
   keywordInput.value = boardState.filters.keyword;
   sourceSelect.value = boardState.filters.source;
   workModeSelect.value = boardState.filters.workMode;
   hiddenSelect.value = boardState.filters.hidden;
+  syncSalaryInput(salaryMinInput, boardState.filters.salaryMin);
+  syncSalaryInput(salaryMaxInput, boardState.filters.salaryMax);
 
   let keywordDebounceHandle = 0;
   keywordInput.addEventListener("input", () => {
@@ -309,6 +331,13 @@ function bindFilterControls(): void {
     boardState.filters.hidden = hiddenSelect.value as HiddenFilter;
     persistFiltersAndRender();
   });
+  const syncSalaryBounds = (): void => {
+    boardState.filters.salaryMin = readSalaryInput(salaryMinInput);
+    boardState.filters.salaryMax = readSalaryInput(salaryMaxInput);
+    persistFiltersAndRender();
+  };
+  salaryMinInput.addEventListener("change", syncSalaryBounds);
+  salaryMaxInput.addEventListener("change", syncSalaryBounds);
   clearButton.addEventListener("click", () => {
     boardState.filters = {
       keyword: "",
@@ -316,11 +345,15 @@ function bindFilterControls(): void {
       locations: [...DEFAULT_LOCATIONS],
       workMode: "all",
       hidden: "active",
+      salaryMin: null,
+      salaryMax: null,
     };
     keywordInput.value = "";
     sourceSelect.value = "all";
     workModeSelect.value = "all";
     hiddenSelect.value = "active";
+    syncSalaryInput(salaryMinInput, null);
+    syncSalaryInput(salaryMaxInput, null);
     persistFiltersAndRender();
     renderLocationChips();
   });

@@ -1,4 +1,5 @@
 import { KEYWORD_MIN_LENGTH } from "./constants";
+import { matchesSalaryRange } from "./salary";
 import type { BoardFilters, JobListing } from "./types";
 
 export function normalizeSearchText(rawText: string): string {
@@ -69,6 +70,9 @@ export function matchesFilters(
     return false;
   }
   if (matchesKeyword(job, filters.keyword) === false) {
+    return false;
+  }
+  if (matchesSalaryRange(job.salary, filters.salaryMin, filters.salaryMax) === false) {
     return false;
   }
   return true;

@@ -66,6 +66,16 @@
               </select>
             </label>
           </div>
+          <div class="field-row">
+            <label class="field">
+              <span class="field-label">min salary (€ per year)</span>
+              <input id="salaryMinInput" class="retro-input" type="number" min="0" step="1000" inputmode="numeric" placeholder="no minimum" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span class="field-label">max salary (€ per year)</span>
+              <input id="salaryMaxInput" class="retro-input" type="number" min="0" step="1000" inputmode="numeric" placeholder="no maximum" autocomplete="off" />
+            </label>
+          </div>
           <fieldset class="location-group">
             <legend class="field-label">location (Dublin and Wicklow selected by default)</legend>
             <div id="locationChips" class="chips" role="group" aria-label="Location options"></div>

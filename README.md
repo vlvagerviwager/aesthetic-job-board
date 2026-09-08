@@ -42,6 +42,7 @@ Board URLs live in `config/sources.json`, which `scripts/fetch-jobs.ts` reads at
 * The filters panel has keyword search across title, organisation, summary, and location.
 * Location chips include Irish counties plus remote, hybrid, and nationwide style values, with Dublin and Wicklow selected by default. Clearing all locations shows every location. Note roles with a bare location like "Other" or "Ireland" are hidden until you clear the defaults or add more locations.
 * Source, work mode, and visibility selects narrow to Publicjobs or Activelink, remote or hybrid or on site, and active only or active plus hidden or hidden only.
+* Min and max salary inputs filter by annual € equivalent. Hourly rates are annualised to full time (×2080 hours) and ranges match on overlap, so a €36–43K role still matches a €40K minimum. Roles with no parseable figure are hidden while a salary bound is set.
 * Each role card links out to the original posting and has a hide or unhide button. Hides apply instantly in the browser and persist in localStorage on top of the shared `config/hidden.json` base.
 * Salary is shown on the card when the advertiser publishes it. Activelink detail pages often include it; Publicjobs list and detail pages do not, so those cards show no salary line.
 * The theme toggle switches light and dark mode and respects the system preference on first load.

@@ -39,4 +39,6 @@ export interface BoardFilters {
   locations: string[];
   workMode: WorkModeFilter;
   hidden: HiddenFilter;
+  salaryMin: number | null;
+  salaryMax: number | null;
 }

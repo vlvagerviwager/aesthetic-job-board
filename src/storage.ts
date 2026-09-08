@@ -9,6 +9,17 @@ import type { BoardFilters } from "./types";
 
 const THEME_QUERY = "(prefers-color-scheme: dark)";
 
+function readSalaryBound(rawValue: unknown, fallbackValue: number | null): number | null {
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    return null;
+  }
+  const parsedValue = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  if (Number.isFinite(parsedValue) === false || parsedValue < 0) {
+    return fallbackValue;
+  }
+  return Math.floor(parsedValue);
+}
+
 const SOURCE_FILTER_VALUES: string[] = ["all", "publicjobs", "activelink"];
 const WORK_MODE_FILTER_VALUES: string[] = ["all", "remote", "hybrid", "onsite"];
 const HIDDEN_FILTER_VALUES: string[] = ["active", "all", "hidden"];
@@ -78,6 +89,8 @@ export function readStoredFilters(fallbackFilters: BoardFilters): BoardFilters {
         typeof parsedValue.hidden === "string" && HIDDEN_FILTER_VALUES.includes(parsedValue.hidden)
           ? parsedValue.hidden
           : fallbackFilters.hidden,
+      salaryMin: readSalaryBound(parsedValue.salaryMin, fallbackFilters.salaryMin),
+      salaryMax: readSalaryBound(parsedValue.salaryMax, fallbackFilters.salaryMax),
     };
   } catch (error) {
     console.warn("Could not read stored filters, using defaults.", error);
