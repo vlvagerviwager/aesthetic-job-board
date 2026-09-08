@@ -6,6 +6,7 @@
   "description": "Pastel retro job board aggregating publicjobs and activelink listings",
   "scripts": {
     "dev": "vite",
+    "dev:fetch": "bun run jobs:fetch && bun run dev",
     "build": "bun run jobs:fetch && vite build",
     "build:offline": "vite build",
     "preview": "vite preview",
