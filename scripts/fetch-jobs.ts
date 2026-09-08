@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { resolveBoardUrl } from "../src/urls";
 import { detectWorkMode } from "../src/workMode";
 import type { JobListing, JobsPayload, SourceId } from "../src/types";
 
@@ -152,12 +153,22 @@ export function parsePublicjobsDate(dateText: string): string {
   return parsedDate.toISOString();
 }
 
-export function resolvePublicjobsUrl(detailHref: string, boardUrl: string): string {
-  try {
-    return new URL(detailHref, boardUrl).toString();
-  } catch {
-    return boardUrl;
+export function parseActivelinkDate(dateAttr: string): string {
+  const trimmedAttr = dateAttr.trim();
+  if (trimmedAttr === "") {
+    return new Date().toISOString();
   }
+  const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmedAttr)
+    ? new Date(`${trimmedAttr}T09:00:00.000Z`)
+    : new Date(trimmedAttr);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return new Date().toISOString();
+  }
+  return parsedDate.toISOString();
+}
+
+export function resolvePublicjobsUrl(detailHref: string, boardUrl: string): string {
+  return resolveBoardUrl(detailHref, boardUrl);
 }
 
 function extractOrganisationFromActivelinkTitle(fullTitle: string, fallbackOrg: string): string {
@@ -416,9 +427,8 @@ async function fetchActivelinkListings(
         .trim();
       const postedAttr = cardSelection.find(".icon-text--start time").first().attr("datetime") ?? "";
       const closingAttr = cardSelection.find(".icon-text--expiry time").first().attr("datetime") ?? "";
-      const postedDate =
-        postedAttr === "" ? new Date().toISOString() : new Date(`${postedAttr}T09:00:00.000Z`).toISOString();
-      const closingDate = closingAttr === "" ? postedDate : new Date(`${closingAttr}T09:00:00.000Z`).toISOString();
+      const postedDate = parseActivelinkDate(postedAttr);
+      const closingDate = closingAttr === "" ? postedDate : parseActivelinkDate(closingAttr);
       const categoryTexts: string[] = [];
       cardSelection.find(".category-list__item a").each((_tagIndex, tagElement) => {
         const tagText = cheerioRoot(tagElement).text().replace(/\s+/g, " ").trim();
@@ -467,6 +477,10 @@ async function readHiddenIds(): Promise<Set<string>> {
       return new Set<string>();
     }
     const hiddenList = (await hiddenFile.json()) as string[];
+    if (Array.isArray(hiddenList) === false) {
+      console.warn("Hidden config is not a list, continuing with none hidden.");
+      return new Set<string>();
+    }
     return new Set(hiddenList);
   } catch (error) {
     console.warn("Could not read hidden config, continuing with none hidden.", error);

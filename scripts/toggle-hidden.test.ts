@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseArgs } from "./toggle-hidden";
+import { isUnknownId, parseArgs } from "./toggle-hidden";
 
 describe("parseArgs", () => {
   test("parses space separated id", () => {
@@ -24,5 +24,16 @@ describe("parseArgs", () => {
 
   test("defaults to empty target", () => {
     expect(parseArgs([]).targetId).toBe("");
+  });
+});
+
+describe("isUnknownId", () => {
+  test("allows anything when the payload is missing", () => {
+    expect(isUnknownId(null, "whatever")).toBe(false);
+  });
+
+  test("flags ids absent from the payload", () => {
+    expect(isUnknownId(new Set(["a"]), "b")).toBe(true);
+    expect(isUnknownId(new Set(["a"]), "a")).toBe(false);
   });
 });

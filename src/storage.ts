@@ -9,7 +9,7 @@ import type { BoardFilters } from "./types";
 
 const THEME_QUERY = "(prefers-color-scheme: dark)";
 
-function readSalaryBound(rawValue: unknown, fallbackValue: number | null): number | null {
+export function readSalaryBound(rawValue: unknown, fallbackValue: number | null): number | null {
   if (rawValue === null || rawValue === undefined || rawValue === "") {
     return null;
   }
@@ -35,7 +35,11 @@ export function getInitialTheme(): string {
 
 export function applyTheme(themeName: string): void {
   document.documentElement.dataset.theme = themeName;
-  localStorage.setItem(STORAGE_KEY_THEME, themeName);
+  try {
+    localStorage.setItem(STORAGE_KEY_THEME, themeName);
+  } catch (error) {
+    console.warn("Could not persist theme, continuing without saving.", error);
+  }
 }
 
 export function readHiddenOverrides(): Record<string, boolean> {
@@ -62,7 +66,11 @@ export function readHiddenOverrides(): Record<string, boolean> {
 }
 
 export function writeHiddenOverrides(overrides: Record<string, boolean>): void {
-  localStorage.setItem(STORAGE_KEY_HIDDEN_OVERRIDES, JSON.stringify(overrides));
+  try {
+    localStorage.setItem(STORAGE_KEY_HIDDEN_OVERRIDES, JSON.stringify(overrides));
+  } catch (error) {
+    console.warn("Could not persist hidden overrides.", error);
+  }
 }
 
 export function readStoredFilters(fallbackFilters: BoardFilters): BoardFilters {
@@ -99,5 +107,9 @@ export function readStoredFilters(fallbackFilters: BoardFilters): BoardFilters {
 }
 
 export function writeStoredFilters(filters: BoardFilters): void {
-  localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters));
+  try {
+    localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters));
+  } catch (error) {
+    console.warn("Could not persist filters.", error);
+  }
 }

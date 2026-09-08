@@ -38,6 +38,14 @@ describe("parseSalaryRange", () => {
     });
   });
 
+  test("parses euro-worded figures without a € sign", () => {
+    expect(parseSalaryRange("Salary: 35000 euro per annum")).toEqual({ low: 35000, high: 35000 });
+    expect(parseSalaryRange("Salary: EUR 29,726 - EUR 46,177")).toEqual({
+      low: 29726,
+      high: 46177,
+    });
+  });
+
   test("returns null when no figures exist", () => {
     expect(parseSalaryRange("Salary: Commensurate with experience")).toBeNull();
     expect(parseSalaryRange("Salary in line with the organisation salary scale.")).toBeNull();

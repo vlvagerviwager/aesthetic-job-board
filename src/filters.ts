@@ -87,3 +87,13 @@ export function sortNewestFirst(jobList: JobListing[]): JobListing[] {
   });
   return sortedJobs;
 }
+
+export interface JobPage {
+  visibleJobs: JobListing[];
+  remainingCount: number;
+}
+
+export function paginateJobs(sortedJobs: JobListing[], visibleCount: number): JobPage {
+  const visibleJobs = sortedJobs.slice(0, Math.max(0, visibleCount));
+  return { visibleJobs, remainingCount: sortedJobs.length - visibleJobs.length };
+}

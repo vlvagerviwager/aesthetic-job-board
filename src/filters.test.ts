@@ -4,6 +4,7 @@ import {
   matchesKeyword,
   matchesLocation,
   normalizeSearchText,
+  paginateJobs,
   sortNewestFirst,
   titleMentionsOrganisation,
 } from "./filters";
@@ -88,6 +89,22 @@ describe("titleMentionsOrganisation", () => {
         makeJob({ title: "Laboratory Manager", organisation: "Department of Agriculture" }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("paginateJobs", () => {
+  test("slices to the visible count and reports the remainder", () => {
+    const jobs = [makeJob({ id: "a" }), makeJob({ id: "b" }), makeJob({ id: "c" })];
+    expect(paginateJobs(jobs, 2)).toEqual({ visibleJobs: jobs.slice(0, 2), remainingCount: 1 });
+  });
+
+  test("reports zero remaining when everything fits", () => {
+    const jobs = [makeJob({ id: "a" })];
+    expect(paginateJobs(jobs, 60)).toEqual({ visibleJobs: jobs, remainingCount: 0 });
+  });
+
+  test("clamps negative counts to an empty page", () => {
+    expect(paginateJobs([makeJob({ id: "a" })], -5)).toEqual({ visibleJobs: [], remainingCount: 1 });
   });
 });
 

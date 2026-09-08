@@ -44,6 +44,10 @@ async function readHiddenList(): Promise<string[]> {
   return Array.isArray(parsedList) ? parsedList : [];
 }
 
+export function isUnknownId(knownIds: Set<string> | null, targetId: string): boolean {
+  return knownIds !== null && knownIds.has(targetId) === false;
+}
+
 async function readKnownIds(): Promise<Set<string> | null> {
   try {
     const payloadFile = Bun.file(JOBS_PAYLOAD_PATH);
@@ -84,7 +88,7 @@ async function mainToggle(): Promise<void> {
     process.exit(EXIT_FAILURE_CODE);
   }
   const knownIds = await readKnownIds();
-  if (knownIds !== null && knownIds.has(targetId) === false) {
+  if (isUnknownId(knownIds, targetId)) {
     console.error(`Unknown job id "${targetId}" (not found in ${JOBS_PAYLOAD_PATH}). Nothing changed.`);
     process.exit(EXIT_FAILURE_CODE);
   }

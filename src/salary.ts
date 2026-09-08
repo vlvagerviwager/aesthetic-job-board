@@ -12,6 +12,8 @@ const HOURLY_PATTERN = /per hour|\/hour|hourly|\bp\.?\s?h\.?\b|per hr/i;
 const MONTHLY_PATTERN = /per month|\/month|monthly/i;
 const K_SUFFIX_PATTERN = /\d[\d.,]*\s*[kK]\b/;
 const EURO_AMOUNT_PATTERN = /€\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)/g;
+const EURO_WORD_AMOUNT_PATTERN =
+  /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:€|euros?|eur)\b|(?:€|euros?|eur)\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)/gi;
 const BARE_AMOUNT_PATTERN = /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)/g;
 const SCALE_CONTEXT_PATTERN = /scale|band|\bpay\b/i;
 
@@ -25,6 +27,20 @@ function collectEuroFigures(salaryText: string): number[] {
   let match: RegExpExecArray | null;
   while ((match = EURO_AMOUNT_PATTERN.exec(salaryText)) !== null) {
     const figureText = match[1] ?? "";
+    const figure = parseFigure(figureText);
+    if (Number.isFinite(figure)) {
+      figures.push(figure);
+    }
+  }
+  return figures;
+}
+
+function collectEuroWordFigures(salaryText: string): number[] {
+  const figures: number[] = [];
+  EURO_WORD_AMOUNT_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = EURO_WORD_AMOUNT_PATTERN.exec(salaryText)) !== null) {
+    const figureText = match[1] ?? match[2] ?? "";
     const figure = parseFigure(figureText);
     if (Number.isFinite(figure)) {
       figures.push(figure);
@@ -59,6 +75,9 @@ export function parseSalaryRange(salaryText: string): SalaryRange | null {
   }
   const expandedText = trimmedText.replace(K_RANGE_SHORTHAND_PATTERN, "€$1€$2$3");
   let figures = collectEuroFigures(expandedText);
+  if (figures.length === 0) {
+    figures = collectEuroWordFigures(expandedText);
+  }
   if (figures.length === 0) {
     figures = collectBareScaleFigures(trimmedText);
   }

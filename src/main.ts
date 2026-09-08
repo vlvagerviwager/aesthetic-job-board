@@ -8,6 +8,7 @@ import {
 import {
   isEffectivelyHidden,
   matchesFilters,
+  paginateJobs,
   sortNewestFirst,
   titleMentionsOrganisation,
 } from "./filters";
@@ -28,6 +29,7 @@ import type {
   WorkModeFilter,
 } from "./types";
 import { workModeLabel } from "./workMode";
+import { asSafeHttpUrl } from "./urls";
 
 const DEFAULT_FILTERS: BoardFilters = {
   keyword: "",
@@ -49,6 +51,15 @@ interface BoardState {
 
 const RENDER_PAGE_SIZE = 60;
 const KEYWORD_DEBOUNCE_MS = 150;
+const SALARY_DEBOUNCE_MS = 150;
+
+function debounce(callback: () => void, delayMs: number): () => void {
+  let debounceHandle = 0;
+  return () => {
+    window.clearTimeout(debounceHandle);
+    debounceHandle = window.setTimeout(callback, delayMs);
+  };
+}
 
 const boardState: BoardState = {
   allJobs: [],
@@ -123,8 +134,7 @@ function renderJobs(restoreFocusJobId?: string): void {
     matchesFilters(job, boardState.filters, boardState.hiddenOverrides),
   );
   const sortedJobs = sortNewestFirst(filteredJobs);
-  const visibleJobs = sortedJobs.slice(0, boardState.visibleCount);
-  const remainingCount = sortedJobs.length - visibleJobs.length;
+  const { visibleJobs, remainingCount } = paginateJobs(sortedJobs, boardState.visibleCount);
 
   resultMeta.textContent =
     remainingCount > 0
@@ -169,7 +179,7 @@ function renderJobs(restoreFocusJobId?: string): void {
     const titleHeading = document.createElement("h2");
     titleHeading.className = "job-title";
     const titleLink = document.createElement("a");
-    titleLink.href = job.url;
+    titleLink.href = asSafeHttpUrl(job.url, "#");
     titleLink.target = "_blank";
     titleLink.rel = "noopener noreferrer";
     titleLink.textContent = job.title;
@@ -202,7 +212,7 @@ function renderJobs(restoreFocusJobId?: string): void {
     actionsRow.className = "job-actions";
     const applyLink = document.createElement("a");
     applyLink.className = "retro-button primary";
-    applyLink.href = job.url;
+    applyLink.href = asSafeHttpUrl(job.url, "#");
     applyLink.target = "_blank";
     applyLink.rel = "noopener noreferrer";
     applyLink.textContent = "view role";
@@ -255,7 +265,7 @@ function renderJobs(restoreFocusJobId?: string): void {
     showMoreButton.addEventListener("click", () => {
       boardState.visibleCount += RENDER_PAGE_SIZE;
       renderJobs();
-      getElementByIdOrThrow("showMoreJobs").focus();
+      document.getElementById("showMoreJobs")?.focus();
     });
     jobListContainer.appendChild(showMoreButton);
   }
@@ -311,14 +321,13 @@ function bindFilterControls(): void {
   syncSalaryInput(salaryMinInput, boardState.filters.salaryMin);
   syncSalaryInput(salaryMaxInput, boardState.filters.salaryMax);
 
-  let keywordDebounceHandle = 0;
-  keywordInput.addEventListener("input", () => {
-    window.clearTimeout(keywordDebounceHandle);
-    keywordDebounceHandle = window.setTimeout(() => {
+  keywordInput.addEventListener(
+    "input",
+    debounce(() => {
       boardState.filters.keyword = keywordInput.value;
       persistFiltersAndRender();
-    }, KEYWORD_DEBOUNCE_MS);
-  });
+    }, KEYWORD_DEBOUNCE_MS),
+  );
   sourceSelect.addEventListener("change", () => {
     boardState.filters.source = sourceSelect.value as SourceFilter;
     persistFiltersAndRender();
@@ -331,13 +340,22 @@ function bindFilterControls(): void {
     boardState.filters.hidden = hiddenSelect.value as HiddenFilter;
     persistFiltersAndRender();
   });
+  const salaryRangeHint = getElementByIdOrThrow("salaryRangeHint");
+  const syncSalaryHint = (): void => {
+    const salaryMin = readSalaryInput(salaryMinInput);
+    const salaryMax = readSalaryInput(salaryMaxInput);
+    salaryRangeHint.hidden =
+      salaryMin === null || salaryMax === null || salaryMin <= salaryMax;
+  };
   const syncSalaryBounds = (): void => {
     boardState.filters.salaryMin = readSalaryInput(salaryMinInput);
     boardState.filters.salaryMax = readSalaryInput(salaryMaxInput);
+    syncSalaryHint();
     persistFiltersAndRender();
   };
-  salaryMinInput.addEventListener("change", syncSalaryBounds);
-  salaryMaxInput.addEventListener("change", syncSalaryBounds);
+  salaryMinInput.addEventListener("input", debounce(syncSalaryBounds, SALARY_DEBOUNCE_MS));
+  salaryMaxInput.addEventListener("input", debounce(syncSalaryBounds, SALARY_DEBOUNCE_MS));
+  syncSalaryHint();
   clearButton.addEventListener("click", () => {
     boardState.filters = {
       keyword: "",
@@ -354,6 +372,7 @@ function bindFilterControls(): void {
     hiddenSelect.value = "active";
     syncSalaryInput(salaryMinInput, null);
     syncSalaryInput(salaryMaxInput, null);
+    salaryRangeHint.hidden = true;
     persistFiltersAndRender();
     renderLocationChips();
   });

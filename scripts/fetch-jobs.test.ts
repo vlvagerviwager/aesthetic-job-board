@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   extractSalaryFromDetail,
+  parseActivelinkDate,
   parsePublicjobsDate,
   resolvePublicjobsUrl,
 } from "./fetch-jobs";
@@ -23,6 +24,27 @@ describe("parsePublicjobsDate", () => {
 
   test("falls back to now for unknown month", () => {
     expect(Number.isNaN(Date.parse(parsePublicjobsDate("08 Foo 2026")))).toBe(false);
+  });
+});
+
+describe("parseActivelinkDate", () => {
+  test("parses a bare board date at 09:00 UTC", () => {
+    expect(parseActivelinkDate("2026-09-08")).toBe("2026-09-08T09:00:00.000Z");
+  });
+
+  test("parses full ISO datetimes without appending a second time", () => {
+    expect(parseActivelinkDate("2026-09-08T00:00:00+01:00")).toBe("2026-09-07T23:00:00.000Z");
+  });
+
+  test("falls back to now for garbage", () => {
+    const before = Date.now();
+    const parsed = Date.parse(parseActivelinkDate("definitely not a date"));
+    expect(Number.isNaN(parsed)).toBe(false);
+    expect(parsed).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  test("falls back to now for empty input", () => {
+    expect(Number.isNaN(Date.parse(parseActivelinkDate("")))).toBe(false);
   });
 });
 
