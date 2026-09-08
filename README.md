@@ -39,6 +39,7 @@ Shared hidden roles live in `config/hidden.json`. To hide a role for everyone, f
 * Location chips include Irish counties plus remote, hybrid, and nationwide style values, with Dublin and Wicklow selected by default. Clearing all locations shows every location.
 * Source, work mode, and visibility selects narrow to Publicjobs or Activelink, remote or hybrid or on site, and active only or active plus hidden or hidden only.
 * Each role card links out to the original posting and has a hide or unhide button. Hides apply instantly in the browser and persist in localStorage on top of the shared `config/hidden.json` base.
+* Salary is shown on the card when the advertiser publishes it. Activelink detail pages often include it; Publicjobs list and detail pages do not, so those cards show no salary line.
 * The theme toggle switches light and dark mode and respects the system preference on first load.
 
 ## Useful scripts

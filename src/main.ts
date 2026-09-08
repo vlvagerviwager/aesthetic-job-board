@@ -67,7 +67,7 @@ function matchesKeyword(job: JobListing, keywordRaw: string): boolean {
   if (trimmedKeyword.length < KEYWORD_MIN_LENGTH) {
     return true;
   }
-  const haystack = `${job.title} ${job.organisation} ${job.summary} ${job.locationRaw}`.toLowerCase();
+  const haystack = `${job.title} ${job.organisation} ${job.summary} ${job.locationRaw} ${job.salary}`.toLowerCase();
   return haystack.includes(trimmedKeyword);
 }
 
@@ -237,6 +237,8 @@ function renderJobs(): void {
     locationLine.className = "job-summary";
     locationLine.textContent = `Location: ${job.locationRaw}`;
 
+    const hasSalary = job.salary.trim().length > 0;
+
     const summaryLine = document.createElement("p");
     summaryLine.className = "job-summary";
     summaryLine.textContent = job.summary;
@@ -278,6 +280,12 @@ function renderJobs(): void {
     bodyElement.appendChild(metaRow);
     bodyElement.appendChild(orgLine);
     bodyElement.appendChild(locationLine);
+    if (hasSalary) {
+      const salaryLine = document.createElement("p");
+      salaryLine.className = "job-salary";
+      salaryLine.textContent = `Salary: ${job.salary.trim()}`;
+      bodyElement.appendChild(salaryLine);
+    }
     if (job.summary.trim().length > 0) {
       bodyElement.appendChild(summaryLine);
     }

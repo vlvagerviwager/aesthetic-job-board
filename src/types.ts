@@ -10,6 +10,7 @@ export interface JobListing {
   organisation: string;
   locationRaw: string;
   summary: string;
+  salary: string;
   postedDate: string;
   closingDate: string;
   workMode: WorkMode;

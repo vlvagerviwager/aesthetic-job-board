@@ -28,6 +28,14 @@ const EXCLUDED_ACTIVELINK_TITLE_PATTERNS: RegExp[] = [
   /request for tenders?/i,
 ];
 
+const SALARY_LABEL_PATTERN = /\b(salary|salary scale|salary range|remuneration|hourly rate|rate of pay)\b/i;
+const SALARY_PARAGRAPH_START_PATTERN = /^\s*salary\b/i;
+const SALARY_CONTENT_PATTERN =
+  /€|euro|\beur\b|per annum|per hour|hourly|\bscale\b|\bpay\b|paid|remuner|negotiat|commensurate|experience|depend|pro rata|stipend|honorarium|allowance|increment|\bgrade\b|\brates?\b|wage|b\.o\.e\.|benchmark|align|accordance|qualification/i;
+const SALARY_TEXT_MAX_LENGTH = 160;
+const SALARY_ELLIPSIS = "…";
+const DETAIL_PROGRESS_LOG_EVERY = 50;
+
 const MONTH_LOOKUP: Record<string, string> = {
   jan: "01",
   feb: "02",
@@ -97,6 +105,56 @@ function extractOrganisationFromActivelinkTitle(fullTitle: string, fallbackOrg: 
   return fallbackOrg;
 }
 
+function truncateSalaryText(salaryText: string): string {
+  const trimmedText = salaryText.replace(/\s+/g, " ").trim();
+  if (trimmedText.length <= SALARY_TEXT_MAX_LENGTH) {
+    return trimmedText;
+  }
+  return `${trimmedText.slice(0, SALARY_TEXT_MAX_LENGTH).trim()}${SALARY_ELLIPSIS}`;
+}
+
+function extractSalaryFromDetail(detailHtml: string): string {
+  const detailRoot = cheerio.load(detailHtml);
+  const candidateElements = detailRoot("p, li");
+  for (let elementIndex = 0; elementIndex < candidateElements.length; elementIndex += 1) {
+    const candidateElement = candidateElements.eq(elementIndex);
+    const labelText = candidateElement
+      .find("strong, b")
+      .first()
+      .text()
+      .replace(/\s+/g, " ")
+      .trim();
+    const hasSalaryLabel = labelText !== "" && SALARY_LABEL_PATTERN.test(labelText);
+    const elementText = candidateElement.text().replace(/\s+/g, " ").trim();
+    const startsWithSalary = SALARY_PARAGRAPH_START_PATTERN.test(elementText);
+    if ((hasSalaryLabel || startsWithSalary) && SALARY_CONTENT_PATTERN.test(elementText)) {
+      return truncateSalaryText(elementText);
+    }
+  }
+  return "";
+}
+
+async function enrichActivelinkSalaries(collectedJobs: JobListing[]): Promise<void> {
+  for (let jobIndex = 0; jobIndex < collectedJobs.length; jobIndex += 1) {
+    const jobEntry = collectedJobs[jobIndex];
+    if (jobEntry === undefined) {
+      continue;
+    }
+    if (jobIndex % DETAIL_PROGRESS_LOG_EVERY === 0) {
+      console.log(`Fetching activelink details ${jobIndex + 1} of ${collectedJobs.length}`);
+    }
+    try {
+      const detailHtml = await fetchHtmlWithTimeout(jobEntry.url);
+      jobEntry.salary = extractSalaryFromDetail(detailHtml);
+    } catch (error) {
+      console.warn(`Could not fetch details for ${jobEntry.id}, leaving salary empty.`, error);
+      jobEntry.salary = "";
+    }
+    await sleepMilliseconds(DELAY_BETWEEN_PAGES_MS);
+  }
+  const withSalary = collectedJobs.filter((jobEntry) => jobEntry.salary !== "").length;
+  console.log(`Found salary text for ${withSalary} of ${collectedJobs.length} activelink roles`);
+}
 function extractActivelinkSection(relativeHref: string): string {
   const sectionMatch = relativeHref.match(/^\/vacancies\/([^/?#]+)/);
   return sectionMatch?.[1] ?? "";
@@ -180,6 +238,7 @@ async function fetchPublicjobsListings(): Promise<JobListing[]> {
         closingDate,
         workMode: detectWorkMode(locationRaw, titleText, summaryText),
         hidden: false,
+        salary: "",
       });
     });
     if (jobCards.length < PUBLICJOBS_PAGE_SIZE) {
@@ -259,6 +318,7 @@ async function fetchActivelinkListings(): Promise<JobListing[]> {
         closingDate,
         workMode: detectWorkMode(locationRaw, titleText, summaryText),
         hidden: false,
+        salary: "",
       });
     });
     if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
@@ -266,6 +326,7 @@ async function fetchActivelinkListings(): Promise<JobListing[]> {
     }
     await sleepMilliseconds(DELAY_BETWEEN_PAGES_MS);
   }
+  await enrichActivelinkSalaries(collectedJobs);
   return collectedJobs;
 }
 
