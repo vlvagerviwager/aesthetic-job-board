@@ -128,6 +128,7 @@ function createTag(tagText: string, tagClass: string): HTMLSpanElement {
 }
 
 function renderJobs(restoreFocusJobId?: string): void {
+  const scrollPosition = window.scrollY;
   const jobListContainer = getElementByIdOrThrow("jobList");
   const resultMeta = getElementByIdOrThrow("resultMeta");
   const filteredJobs = boardState.allJobs.filter((job) =>
@@ -152,6 +153,7 @@ function renderJobs(restoreFocusJobId?: string): void {
     emptyCard.appendChild(emptyTitle);
     emptyCard.appendChild(emptyHint);
     jobListContainer.appendChild(emptyCard);
+    window.scrollTo(0, scrollPosition);
     return;
   }
 
@@ -270,15 +272,17 @@ function renderJobs(restoreFocusJobId?: string): void {
     jobListContainer.appendChild(showMoreButton);
   }
 
+  window.scrollTo(0, scrollPosition);
+
   if (restoreFocusJobId !== undefined) {
     const nextFocus = jobListContainer.querySelector<HTMLElement>(
       `[data-hide-job-id="${restoreFocusJobId}"]`,
     );
     if (nextFocus !== null) {
-      nextFocus.focus();
+      nextFocus.focus({ preventScroll: true });
     } else {
       const firstHideButton = jobListContainer.querySelector<HTMLElement>("[data-hide-job-id]");
-      firstHideButton?.focus();
+      firstHideButton?.focus({ preventScroll: true });
     }
   }
 }
