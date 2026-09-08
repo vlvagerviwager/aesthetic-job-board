@@ -12,79 +12,83 @@
     <noscript><p class="noscript-message">This job board needs JavaScript to filter and display roles.</p></noscript>
     <div class="page-grid" aria-hidden="true"></div>
     <main class="page">
-      <header class="window hero">
-        <div class="titlebar">
-          <span class="titlebar-dots" aria-hidden="true">
-            <span class="dot dot-pink"></span>
-            <span class="dot dot-peach"></span>
-            <span class="dot dot-mint"></span>
-          </span>
-          <p class="titlebar-text">vlvagerviwager's jobs board</p>
-          <button id="themeToggle" class="retro-button small" type="button" aria-pressed="false">dark mode</button>
-        </div>
-        <div class="hero-body">
-          <h1>in the future, i have gotten my dream job</h1>
-          <p class="subtitle">Newest roles from Publicjobs and Activelink, in one place.</p>
-          <p class="meta-line" id="buildMeta">loading roles...</p>
-        </div>
-      </header>
+      <div class="layout">
+        <div class="sidebar">
+          <header class="window hero">
+            <div class="titlebar">
+              <span class="titlebar-dots" aria-hidden="true">
+                <span class="dot dot-pink"></span>
+                <span class="dot dot-peach"></span>
+                <span class="dot dot-mint"></span>
+              </span>
+              <p class="titlebar-text">vlvagerviwager's jobs board</p>
+              <button id="themeToggle" class="retro-button small" type="button" aria-pressed="false">dark mode</button>
+            </div>
+            <div class="hero-body">
+              <h1>in the future, i have gotten my dream job</h1>
+              <p class="subtitle">Newest roles from Publicjobs and Activelink, in one place.</p>
+              <p class="meta-line" id="buildMeta">loading roles...</p>
+            </div>
+          </header>
 
-      <section class="window filters" aria-label="Job filters">
-        <div class="titlebar titlebar-accent">
-          <p class="titlebar-text">filters</p>
-          <button id="clearFilters" class="retro-button small" type="button">reset all</button>
+          <section class="window filters" aria-label="Job filters">
+            <div class="titlebar titlebar-accent">
+              <p class="titlebar-text">filters</p>
+              <button id="clearFilters" class="retro-button small" type="button">reset all</button>
+            </div>
+            <div class="filters-body">
+              <label class="field">
+                <span class="field-label">keyword search</span>
+                <input id="keywordInput" class="retro-input" type="search" placeholder="try therapist, part time" autocomplete="off" />
+              </label>
+              <div class="field-row">
+                <label class="field">
+                  <span class="field-label">source</span>
+                  <select id="sourceSelect" class="retro-input">
+                    <option value="all">Publicjobs & Activelink</option>
+                    <option value="publicjobs">Publicjobs only</option>
+                    <option value="activelink">activelink only</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="field-label">work mode</span>
+                  <select id="workModeSelect" class="retro-input">
+                    <option value="all">any</option>
+                    <option value="remote">remote</option>
+                    <option value="hybrid">hybrid</option>
+                    <option value="onsite">on site</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="field-label">visibility</span>
+                  <select id="hiddenSelect" class="retro-input">
+                    <option value="active">active only</option>
+                    <option value="all">active plus hidden</option>
+                    <option value="hidden">hidden only</option>
+                  </select>
+                </label>
+              </div>
+              <div class="field-row">
+                <label class="field">
+                  <span class="field-label">min salary (€ per year)</span>
+                  <input id="salaryMinInput" class="retro-input" type="number" min="0" step="1000" inputmode="numeric" placeholder="no minimum" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span class="field-label">max salary (€ per year)</span>
+                  <input id="salaryMaxInput" class="retro-input" type="number" min="0" step="1000" inputmode="numeric" placeholder="no maximum" autocomplete="off" />
+                </label>
+              </div>
+              <fieldset class="location-group">
+                <legend class="field-label">location (Dublin and Wicklow selected by default)</legend>
+                <div id="locationChips" class="chips" role="group" aria-label="Location options"></div>
+              </fieldset>
+              <p class="result-line" id="resultMeta" role="status"></p>
+            </div>
+          </section>
         </div>
-        <div class="filters-body">
-          <label class="field">
-            <span class="field-label">keyword search</span>
-            <input id="keywordInput" class="retro-input" type="search" placeholder="try youth worker, engineer, part time" autocomplete="off" />
-          </label>
-          <div class="field-row">
-            <label class="field">
-              <span class="field-label">source</span>
-              <select id="sourceSelect" class="retro-input">
-                <option value="all">both sources</option>
-                <option value="publicjobs">publicjobs only</option>
-                <option value="activelink">activelink only</option>
-              </select>
-            </label>
-            <label class="field">
-              <span class="field-label">work mode</span>
-              <select id="workModeSelect" class="retro-input">
-                <option value="all">any mode</option>
-                <option value="remote">remote</option>
-                <option value="hybrid">hybrid</option>
-                <option value="onsite">on site</option>
-              </select>
-            </label>
-            <label class="field">
-              <span class="field-label">visibility</span>
-              <select id="hiddenSelect" class="retro-input">
-                <option value="active">active only</option>
-                <option value="all">active plus hidden</option>
-                <option value="hidden">hidden only</option>
-              </select>
-            </label>
-          </div>
-          <div class="field-row">
-            <label class="field">
-              <span class="field-label">min salary (€ per year)</span>
-              <input id="salaryMinInput" class="retro-input" type="number" min="0" step="1000" inputmode="numeric" placeholder="no minimum" autocomplete="off" />
-            </label>
-            <label class="field">
-              <span class="field-label">max salary (€ per year)</span>
-              <input id="salaryMaxInput" class="retro-input" type="number" min="0" step="1000" inputmode="numeric" placeholder="no maximum" autocomplete="off" />
-            </label>
-          </div>
-          <fieldset class="location-group">
-            <legend class="field-label">location (Dublin and Wicklow selected by default)</legend>
-            <div id="locationChips" class="chips" role="group" aria-label="Location options"></div>
-          </fieldset>
-          <p class="result-line" id="resultMeta" role="status"></p>
-        </div>
-      </section>
 
-      <section id="jobList" class="job-list" aria-label="Job listings"></section>
+        <section id="jobList" class="job-list" aria-label="Job listings"></section>
+      </div>
 
       <footer class="window footer">
         <div class="footer-body">
