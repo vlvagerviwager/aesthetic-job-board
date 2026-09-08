@@ -27,6 +27,10 @@
   --shadow-offset: 4px;
   --font-body: "Avenir Next", "Trebuchet MS", Verdana, sans-serif;
   --font-display: "Cooper Black", "Avenir Next", "Trebuchet MS", sans-serif;
+  --weight-heading: 600;
+  --weight-label: 500;
+  --weight-button: 600;
+  --weight-tag: 600;
   --grid-cell: 28px;
 }
 
@@ -104,7 +108,7 @@ body {
 
 .titlebar-text {
   margin: 0;
-  font-weight: 800;
+  font-weight: var(--weight-heading);
   letter-spacing: 0.02em;
   flex: 1;
 }
@@ -134,9 +138,11 @@ body {
 
 .hero h1 {
   font-family: var(--font-display);
+  font-weight: var(--weight-heading);
   font-size: 2.1rem;
   margin: 0 0 var(--space-sm);
-  line-height: 1.1;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 
 .subtitle {
@@ -153,7 +159,7 @@ body {
   border-radius: var(--radius-pill);
   padding: 4px 12px;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--weight-button);
 }
 
 .field {
@@ -171,10 +177,9 @@ body {
 }
 
 .field-label {
-  font-size: 0.8rem;
-  font-weight: 800;
-  text-transform: lowercase;
-  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+  font-weight: var(--weight-label);
+  letter-spacing: 0.01em;
 }
 
 .retro-input {
@@ -195,7 +200,7 @@ body {
 
 .retro-button {
   font: inherit;
-  font-weight: 800;
+  font-weight: var(--weight-button);
   font-size: 0.85rem;
   background: var(--color-cream);
   color: var(--color-ink);
@@ -242,7 +247,7 @@ body {
 .chip {
   font: inherit;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--weight-label);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-cream);
@@ -253,6 +258,7 @@ body {
 
 .chip[aria-pressed="true"] {
   background: var(--color-pink);
+  font-weight: var(--weight-button);
   color: #fff;
 }
 
@@ -264,7 +270,7 @@ body {
   margin: var(--space-sm) 0 0;
   color: var(--color-muted);
   font-size: 0.9rem;
-  font-weight: 700;
+  font-weight: var(--weight-label);
 }
 
 .job-list {
@@ -293,7 +299,8 @@ body {
 .job-title {
   margin: 0 0 var(--space-xs);
   font-size: 1.15rem;
-  line-height: 1.3;
+  font-weight: var(--weight-heading);
+  line-height: 1.4;
 }
 
 .job-title a {
@@ -311,7 +318,7 @@ body {
 
 .tag {
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: var(--weight-tag);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-pill);
   padding: 3px 10px;

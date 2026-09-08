@@ -19,6 +19,15 @@ const SECOND_PAGE_INDEX = 1;
 const HIDDEN_CONFIG_PATH = "config/hidden.json";
 const OUTPUT_PAYLOAD_PATH = "public/data/jobs.json";
 
+const EXCLUDED_ACTIVELINK_SECTIONS: string[] = ["tenders", "voluntary", "volunteering"];
+const EXCLUDED_ACTIVELINK_CATEGORY_PATTERN = /\b(tenders?|voluntary|volunteering)\b/i;
+const EXCLUDED_ACTIVELINK_TITLE_PATTERNS: RegExp[] = [
+  /^\s*volunteers?\b/i,
+  /^\s*voluntary\b/i,
+  /invitation to tender/i,
+  /request for tenders?/i,
+];
+
 const MONTH_LOOKUP: Record<string, string> = {
   jan: "01",
   feb: "02",
@@ -86,6 +95,32 @@ function extractOrganisationFromActivelinkTitle(fullTitle: string, fallbackOrg: 
     return fullTitle.slice(0, colonIndex).trim();
   }
   return fallbackOrg;
+}
+
+function extractActivelinkSection(relativeHref: string): string {
+  const sectionMatch = relativeHref.match(/^\/vacancies\/([^/?#]+)/);
+  return sectionMatch?.[1] ?? "";
+}
+
+function isExcludedActivelinkListing(
+  sectionSlug: string,
+  titleText: string,
+  categoryTexts: string[],
+): boolean {
+  if (EXCLUDED_ACTIVELINK_SECTIONS.includes(sectionSlug.toLowerCase())) {
+    return true;
+  }
+  for (const categoryText of categoryTexts) {
+    if (EXCLUDED_ACTIVELINK_CATEGORY_PATTERN.test(categoryText)) {
+      return true;
+    }
+  }
+  for (const titlePattern of EXCLUDED_ACTIVELINK_TITLE_PATTERNS) {
+    if (titlePattern.test(titleText)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function fetchPublicjobsListings(): Promise<JobListing[]> {
@@ -196,12 +231,17 @@ async function fetchActivelinkListings(): Promise<JobListing[]> {
       const postedDate =
         postedAttr === "" ? new Date().toISOString() : new Date(`${postedAttr}T09:00:00.000Z`).toISOString();
       const closingDate = closingAttr === "" ? postedDate : new Date(`${closingAttr}T09:00:00.000Z`).toISOString();
-      const categoryText = cardSelection
-        .find(".category-list__item a")
-        .first()
-        .text()
-        .replace(/\s+/g, " ")
-        .trim();
+      const categoryTexts: string[] = [];
+      cardSelection.find(".category-list__item a").each((_tagIndex, tagElement) => {
+        const tagText = cheerioRoot(tagElement).text().replace(/\s+/g, " ").trim();
+        if (tagText !== "") {
+          categoryTexts.push(tagText);
+        }
+      });
+      if (isExcludedActivelinkListing(extractActivelinkSection(relativeHref), titleText, categoryTexts)) {
+        return;
+      }
+      const categoryText = categoryTexts[0] ?? "";
       const organisation = extractOrganisationFromActivelinkTitle(
         titleText,
         categoryText === "" ? "Community role" : categoryText,
