@@ -1,0 +1,23 @@
+{
+  "name": "aesthetic-job-board",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Pastel retro job board aggregating publicjobs and activelink listings",
+  "scripts": {
+    "dev": "vite",
+    "build": "bun run jobs:fetch && vite build",
+    "build:offline": "vite build",
+    "preview": "vite preview",
+    "jobs:fetch": "bun scripts/fetch-jobs.ts",
+    "jobs:hide": "bun scripts/toggle-hidden.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "bun-types": "^1.4.2",
+    "cheerio": "^1.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

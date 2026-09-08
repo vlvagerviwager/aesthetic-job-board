@@ -1,0 +1,41 @@
+export type SourceId = "publicjobs" | "activelink";
+
+export type WorkMode = "remote" | "hybrid" | "onsite";
+
+export interface JobListing {
+  id: string;
+  source: SourceId;
+  title: string;
+  url: string;
+  organisation: string;
+  locationRaw: string;
+  summary: string;
+  postedDate: string;
+  closingDate: string;
+  workMode: WorkMode;
+  hidden: boolean;
+}
+
+export interface JobsPayload {
+  generatedAt: string;
+  sources: Array<{
+    id: SourceId;
+    label: string;
+    boardUrl: string;
+  }>;
+  jobs: JobListing[];
+}
+
+export type HiddenFilter = "active" | "hidden" | "all";
+
+export type WorkModeFilter = "all" | WorkMode;
+
+export type SourceFilter = "all" | SourceId;
+
+export interface BoardFilters {
+  keyword: string;
+  source: SourceFilter;
+  locations: string[];
+  workMode: WorkModeFilter;
+  hidden: HiddenFilter;
+}

@@ -1,0 +1,33 @@
+name: daily jobs refresh
+
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - run: bun run jobs:fetch
+      - run: bun run typecheck
+      - run: bun run build:offline
+      - name: commit fresh jobs data
+        run: |
+          if git status --porcelain public/data/jobs.json | grep -q .; then
+            git config user.name "jobs-bot"
+            git config user.email "jobs-bot@users.noreply.github.com"
+            git add public/data/jobs.json
+            git commit -m "chore: refresh jobs data"
+            git push
+          else
+            echo "No job changes."
+          fi

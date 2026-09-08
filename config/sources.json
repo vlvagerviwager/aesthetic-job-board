@@ -1,0 +1,14 @@
+[
+  {
+    "id": "publicjobs",
+    "label": "Publicjobs",
+    "boardUrl": "https://publicjobs.tal.net/vx/lang-en-GB/mobile-0/appcentre-ext/brand-4/xf-7ecb593daca6/candidate/jobboard/vacancy/3/adv/",
+    "notes": "No public JSON API found. Board is server rendered HTML backed by Oleeo Solr search. Build script parses the HTML list at build time."
+  },
+  {
+    "id": "activelink",
+    "label": "Activelink",
+    "boardUrl": "https://www.activelink.ie/vacancies",
+    "notes": "No public JSON API found. Board is server rendered Drupal HTML. Build script parses article teasers at build time."
+  }
+]

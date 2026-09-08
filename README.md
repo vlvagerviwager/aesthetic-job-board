@@ -1,2 +1,60 @@
 # aesthetic-job-board
-Pulls in jobs that I care about, in a user-friendly and aesthetic UI. 
+
+A front facing job board that pulls in roles I care about in an aesthetic pastel UI. It aggregates Irish Publicjobs and Activelink listings, always shows the most recently posted jobs first, and lets me hide roles, filter by hidden state, filter by location, search by keyword, and filter by remote, hybrid, or on site work mode.
+
+## How to run locally
+
+1. Install dependencies:
+```bash
+bun install
+```
+2. Fetch fresh listings:
+```bash
+bun run jobs:fetch
+```
+3. Start the dev server:
+
+```bash
+bun run dev
+```
+4. Open the URL shown in the terminal, usually [http://localhost:5192](http://localhost:5192)
+5. Build for production:
+
+```bash
+bun run build && bun run preview
+```
+
+Requires Bun 1.0 or newer. Tested in Firefox with support for other modern browsers.
+
+## Job sources
+
+Two configured sources in `config/sources.json`: Publicjobs (`publicjobs.tal.net` job board) and Activelink (`activelink.ie` vacancies). No public JSON APIs were found for either board, so `scripts/fetch-jobs.ts` parses the server rendered HTML list pages at build time (Oleeo Solr HTML for Publicjobs, Drupal teasers for Activelink) and writes `public/data/jobs.json` sorted newest first.
+
+Shared hidden roles live in `config/hidden.json`. To hide a role for everyone, find its id in `public/data/jobs.json` (for example `publicjobs-8486` or `activelink-127885`), then run `bun run jobs:hide -- --id <job-id>` and commit the updated config. Run with `--unhide` to remove it. A daily GitHub Actions workflow refetches listings, typechecks, builds, and commits updated data.
+
+## Using the board
+
+* The header shows when listings were last generated and how many roles were pulled in.
+* The filters panel has keyword search across title, organisation, summary, and location.
+* Location chips include Irish counties plus remote, hybrid, and nationwide style values, with Dublin and Wicklow selected by default. Clearing all locations shows every location.
+* Source, work mode, and visibility selects narrow to Publicjobs or Activelink, remote or hybrid or on site, and active only or active plus hidden or hidden only.
+* Each role card links out to the original posting and has a hide or unhide button. Hides apply instantly in the browser and persist in localStorage on top of the shared `config/hidden.json` base.
+* The theme toggle switches light and dark mode and respects the system preference on first load.
+
+## Useful scripts
+
+* `bun run dev` - start the dev server
+* `bun run jobs:fetch` - fetch both boards and write `public/data/jobs.json`
+* `bun run jobs:hide -- --id <job-id>` - hide a role in `config/hidden.json`, add `--unhide` to remove
+* `bun run build` - fetch jobs and build for production
+* `bun run build:offline` - build for production without fetching
+* `bun run preview` - preview the production build
+* `bun run typecheck` - run `tsc --noEmit`
+
+## Tech stack
+
+* TypeScript
+* Vite
+* Bun for scripts and package management
+* Vanilla DOM and CSS with no framework
+* Cheerio for build time HTML parsing

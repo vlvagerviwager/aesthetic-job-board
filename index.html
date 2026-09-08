@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vlvagerviwager jobs board</title>
+    <meta name="description" content="A board for publicjobs and activelink roles, newest first." />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="page-grid" aria-hidden="true"></div>
+    <main class="page">
+      <header class="window hero">
+        <div class="titlebar">
+          <span class="titlebar-dots" aria-hidden="true">
+            <span class="dot dot-pink"></span>
+            <span class="dot dot-peach"></span>
+            <span class="dot dot-mint"></span>
+          </span>
+          <p class="titlebar-text">soft jobs board</p>
+          <button id="themeToggle" class="retro-button small" type="button" aria-pressed="false">dark mode</button>
+        </div>
+        <div class="hero-body">
+          <h1>find something soft to do</h1>
+          <p class="subtitle">Newest roles from Publicjobs and Activelink in one place. Hide what is not for you.</p>
+          <p class="meta-line" id="buildMeta">loading roles...</p>
+        </div>
+      </header>
+
+      <section class="window filters" aria-label="Job filters">
+        <div class="titlebar titlebar-lavender">
+          <p class="titlebar-text">filters</p>
+          <button id="clearFilters" class="retro-button small" type="button">reset all</button>
+        </div>
+        <div class="filters-body">
+          <label class="field">
+            <span class="field-label">keyword search</span>
+            <input id="keywordInput" class="retro-input" type="search" placeholder="try youth worker, engineer, part time" autocomplete="off" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span class="field-label">source</span>
+              <select id="sourceSelect" class="retro-input">
+                <option value="all">both sources</option>
+                <option value="publicjobs">publicjobs only</option>
+                <option value="activelink">activelink only</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">work mode</span>
+              <select id="workModeSelect" class="retro-input">
+                <option value="all">any mode</option>
+                <option value="remote">remote</option>
+                <option value="hybrid">hybrid</option>
+                <option value="onsite">on site</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">visibility</span>
+              <select id="hiddenSelect" class="retro-input">
+                <option value="active">active only</option>
+                <option value="all">active plus hidden</option>
+                <option value="hidden">hidden only</option>
+              </select>
+            </label>
+          </div>
+          <fieldset class="location-group">
+            <legend class="field-label">location (Dublin and Wicklow selected by default)</legend>
+            <div id="locationChips" class="chips" role="group" aria-label="Location options"></div>
+          </fieldset>
+          <p class="result-line" id="resultMeta" role="status"></p>
+        </div>
+      </section>
+
+      <section id="jobList" class="job-list" aria-live="polite" aria-label="Job listings"></section>
+
+      <footer class="window footer">
+        <div class="footer-body">
+          <p>Built fresh every day with Bun. Hide state ships from <code>config/hidden.json</code> plus your local overrides.</p>
+          <p>To hide a role for everyone, run <code>bun run jobs:hide -- --id &lt;job-id&gt;</code> then commit.</p>
+        </div>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
