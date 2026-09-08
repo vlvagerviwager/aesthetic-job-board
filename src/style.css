@@ -1,20 +1,26 @@
 :root {
-  --color-grid-bg: #b6bfee;
-  --color-grid-line: rgba(255, 255, 255, 0.55);
-  --color-ink: #38334d;
-  --color-muted: #6f6892;
-  --color-card: #fff7ee;
+  --color-grid-bg: #8f9fe6;
+  --color-grid-line: rgba(255, 255, 255, 0.65);
+  --color-ink: #232a3d;
+  --color-muted: #5f5486;
+  --color-card: #fffaf2;
   --color-card-soft: #fff1e2;
-  --color-pink: #ef6ba2;
-  --color-pink-deep: #d94f8a;
-  --color-pink-pale: #f8b8d2;
-  --color-peach: #ffd8bf;
-  --color-cream: #fffdf8;
-  --color-yellow: #ffe08a;
-  --color-mint: #c9e9c0;
-  --color-lavender: #dfe3ff;
-  --color-lavender-deep: #b9c2f2;
-  --color-border: #38334d;
+  --color-pink: #f7a8c6;
+  --color-pink-deep: #c62f45;
+  --color-pink-pale: #f9b1cd;
+  --color-peach: #ffcf9f;
+  --color-peach-soft: #ffe9d6;
+  --color-cream: #ffffff;
+  --color-yellow: #ffcf4d;
+  --color-yellow-soft: #fff3c4;
+  --color-mint: #bfe8b0;
+  --color-lavender: #d7ddff;
+  --color-lavender-deep: #aab4ee;
+  --color-red: #c62f45;
+  --color-navy: #232a5a;
+  --color-border: #232a3d;
+  --color-link: #232a5a;
+  --color-focus: #232a5a;
   --space-xs: 6px;
   --space-sm: 10px;
   --space-md: 16px;
@@ -24,7 +30,7 @@
   --radius-titlebar: 11px;
   --radius-pill: 999px;
   --border-width: 2px;
-  --shadow-offset: 4px;
+  --shadow-offset: 5px;
   --font-body: "Avenir Next", "Trebuchet MS", Verdana, sans-serif;
   --font-display: "Cooper Black", "Avenir Next", "Trebuchet MS", sans-serif;
   --weight-heading: 600;
@@ -35,22 +41,28 @@
 }
 
 [data-theme="dark"] {
-  --color-grid-bg: #241f36;
-  --color-grid-line: rgba(248, 184, 210, 0.14);
-  --color-ink: #f4e9f4;
-  --color-muted: #c4b6dd;
-  --color-card: #322b47;
-  --color-card-soft: #2b2540;
-  --color-pink: #f28bb7;
-  --color-pink-deep: #f06fa0;
-  --color-pink-pale: #5c4a6e;
-  --color-peach: #6e5570;
+  --color-grid-bg: #141022;
+  --color-grid-line: rgba(249, 177, 205, 0.16);
+  --color-ink: #f9eef6;
+  --color-muted: #d3c6e8;
+  --color-card: #3e365c;
+  --color-card-soft: #2c2545;
+  --color-pink: #ff8fa0;
+  --color-pink-deep: #ff8fa0;
+  --color-pink-pale: #5c2340;
+  --color-peach: #5c3a2a;
+  --color-peach-soft: #443055;
   --color-cream: #241f36;
-  --color-yellow: #8a7440;
-  --color-mint: #4c6b52;
-  --color-lavender: #3a3460;
+  --color-yellow: #ffd74d;
+  --color-yellow-soft: #4a3d18;
+  --color-mint: #3d4a2e;
+  --color-lavender: #5a4416;
   --color-lavender-deep: #4a4480;
-  --color-border: #f4e9f4;
+  --color-red: #ff8fa0;
+  --color-navy: #ffd74d;
+  --color-border: #f9eef6;
+  --color-link: #ffe9a8;
+  --color-focus: #ffd74d;
 }
 
 * {
@@ -98,11 +110,20 @@ body {
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
-  background: var(--color-pink-pale);
+  background: var(--color-pink);
   border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-ink);
 }
 
 .titlebar-lavender {
+  background: var(--color-yellow);
+}
+
+[data-theme="dark"] .titlebar {
+  background: var(--color-pink-pale);
+}
+
+[data-theme="dark"] .titlebar-lavender {
   background: var(--color-lavender);
 }
 
@@ -126,9 +147,12 @@ body {
   display: inline-block;
 }
 
-.dot-pink { background: var(--color-pink); }
-.dot-peach { background: var(--color-peach); }
-.dot-mint { background: var(--color-mint); }
+.dot-pink { background: var(--color-red); }
+.dot-peach { background: var(--color-yellow); }
+.dot-mint { background: var(--color-navy); }
+
+[data-theme="dark"] .dot-peach { background: var(--color-yellow); }
+[data-theme="dark"] .dot-mint { background: var(--color-yellow); }
 
 .hero-body,
 .filters-body,
@@ -155,11 +179,16 @@ body {
   margin: 0;
   display: inline-block;
   background: var(--color-yellow);
+  color: #000;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-pill);
   padding: 4px 12px;
   font-size: 0.85rem;
   font-weight: var(--weight-button);
+}
+
+[data-theme="dark"] .meta-line {
+  color: #000;
 }
 
 .field {
@@ -194,8 +223,10 @@ body {
 
 .retro-input:focus-visible,
 .retro-button:focus-visible,
-.chip:focus-visible {
-  outline: 3px solid var(--color-pink);
+.chip:focus-visible,
+.job-title a:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .retro-button {
@@ -221,13 +252,19 @@ body {
 }
 
 .retro-button.primary {
-  background: var(--color-pink);
+  background: var(--color-navy);
+  border-color: var(--color-navy);
   color: #fff;
 }
 
+.retro-button.primary:hover {
+  filter: brightness(1.12);
+}
+
 [data-theme="dark"] .retro-button.primary {
-  color: #241f36;
-  background: var(--color-pink);
+  color: #1e2450;
+  background: var(--color-yellow);
+  border-color: var(--color-yellow);
 }
 
 .location-group {
@@ -235,7 +272,7 @@ body {
   border-radius: 12px;
   padding: var(--space-md);
   margin: 0 0 var(--space-md);
-  background: var(--color-card-soft);
+  background: var(--color-peach-soft);
 }
 
 .chips {
@@ -258,12 +295,15 @@ body {
 
 .chip[aria-pressed="true"] {
   background: var(--color-pink);
+  border-color: var(--color-border);
   font-weight: var(--weight-button);
-  color: #fff;
+  color: var(--color-navy);
 }
 
 [data-theme="dark"] .chip[aria-pressed="true"] {
-  color: #241f36;
+  color: #1e2450;
+  background: var(--color-yellow);
+  border-color: var(--color-yellow);
 }
 
 .result-line {
@@ -280,15 +320,27 @@ body {
 }
 
 .job-card .titlebar {
-  background: var(--color-lavender);
+  background: var(--color-peach);
   padding: 8px var(--space-md);
 }
 
 .job-card.is-hidden-job .titlebar {
-  background: var(--color-peach);
+  background: var(--color-pink-pale);
 }
 
 .job-card.is-remote .titlebar {
+  background: var(--color-mint);
+}
+
+[data-theme="dark"] .job-card .titlebar {
+  background: var(--color-peach);
+}
+
+[data-theme="dark"] .job-card.is-hidden-job .titlebar {
+  background: var(--color-pink-pale);
+}
+
+[data-theme="dark"] .job-card.is-remote .titlebar {
   background: var(--color-mint);
 }
 
@@ -304,9 +356,14 @@ body {
 }
 
 .job-title a {
-  color: inherit;
+  color: var(--color-link);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
+  text-decoration-color: var(--color-red);
+}
+
+.job-title a:hover {
+  text-decoration-thickness: 3px;
 }
 
 .job-meta {
@@ -325,12 +382,23 @@ body {
   background: var(--color-cream);
 }
 
-.tag-source-publicjobs { background: var(--color-yellow); }
-.tag-source-activelink { background: var(--color-mint); }
-.tag-mode-remote { background: var(--color-mint); }
-.tag-mode-hybrid { background: var(--color-peach); }
-.tag-mode-onsite { background: var(--color-lavender); }
-.tag-hidden { background: var(--color-pink); color: #fff; }
+.tag-source-publicjobs { background: var(--color-yellow); color: var(--color-ink); }
+.tag-source-activelink { background: var(--color-mint); color: var(--color-ink); }
+.tag-mode-remote { background: var(--color-mint); color: var(--color-ink); }
+.tag-mode-hybrid { background: var(--color-peach); color: var(--color-ink); }
+.tag-mode-onsite { background: var(--color-lavender); color: var(--color-ink); }
+.tag-hidden { background: var(--color-red); border-color: var(--color-red); color: #fff; }
+
+[data-theme="dark"] .tag {
+  color: var(--color-ink);
+}
+
+[data-theme="dark"] .tag-source-publicjobs { background: var(--color-yellow); color: #1e2450; border-color: var(--color-yellow); }
+[data-theme="dark"] .tag-source-activelink,
+[data-theme="dark"] .tag-mode-remote { background: var(--color-pink); color: #241f36; border-color: var(--color-pink); }
+[data-theme="dark"] .tag-mode-hybrid { background: var(--color-peach); }
+[data-theme="dark"] .tag-mode-onsite { background: var(--color-lavender); }
+[data-theme="dark"] .tag-hidden { background: var(--color-red); border-color: var(--color-red); color: #241f36; }
 
 .job-summary {
   margin: var(--space-sm) 0;
@@ -343,7 +411,7 @@ body {
   line-height: 1.55;
   color: var(--color-ink);
   font-weight: var(--weight-button);
-  background: var(--color-card-soft);
+  background: var(--color-yellow-soft);
   border: var(--border-width) dashed var(--color-border);
   border-radius: 10px;
   padding: 7px 12px;
@@ -381,6 +449,20 @@ code {
   margin: 0 0 8px;
   color: var(--color-muted);
   font-size: 0.9rem;
+}
+
+.footer.window {
+  background: var(--color-peach-soft);
+}
+
+[data-theme="dark"] .footer.window {
+  background: var(--color-card);
+  border-style: dashed;
+}
+
+::selection {
+  background: var(--color-yellow);
+  color: var(--color-ink);
 }
 
 @media (max-width: 720px) {
