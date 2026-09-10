@@ -6,6 +6,8 @@ A front facing job board that pulls in roles I care about in an aesthetic pastel
 
 This was created for personal use. 
 
+**License:** PolyForm Noncommercial 1.0.0: see [LICENSE](LICENSE). Commercial use requires separate license.
+
 ## How to run locally
 
 1. Install dependencies:
