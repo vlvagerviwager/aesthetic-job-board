@@ -36,7 +36,7 @@ Requires Bun 1.0 or newer. Tested in Firefox with support for other modern brows
 
 ## Job sources
 
-Two configured sources in `config/sources.json`: Publicjobs (`publicjobs.tal.net` job board) and Activelink (`activelink.ie` vacancies). No public JSON APIs were found for either board, so `scripts/fetch-jobs.ts` parses the server rendered HTML list pages at build time (Oleeo Solr HTML for Publicjobs, Drupal teasers for Activelink) and writes `public/data/jobs.json` sorted newest first.
+Two configured sources in `config/sources.json`: Publicjobs (`publicjobs.tal.net` job board) and Activelink (`activelink.ie` vacancies), plus RoomPriceGenie (`roompricegenie.com/careers`). No public JSON APIs were found for either Irish board, so `scripts/fetch-jobs.ts` parses the server rendered HTML list pages at build time (Oleeo Solr HTML for Publicjobs, Drupal teasers for Activelink). RoomPriceGenie is Ashby-hosted and read from the public Ashby posting API. Everything is written to `public/data/jobs.json` sorted newest first.
 
 Shared hidden roles live in `config/hidden.json`. To hide a role for everyone, find its id in `public/data/jobs.json` (for example `publicjobs-8486` or `activelink-127885`), then run `bun run jobs:hide -- --id <job-id>` and commit the updated config. Run with `--unhide` to remove it. The command validates the id against the latest fetched listings and refuses unknown ids. A daily GitHub Actions workflow refetches listings, typechecks, builds, and commits updated data.
 
@@ -46,8 +46,8 @@ Board URLs live in `config/sources.json`, which `scripts/fetch-jobs.ts` reads at
 
 * The header shows when listings were last generated and how many roles were pulled in.
 * The filters panel has keyword search across title, organisation, summary, and location.
-* Location chips include Irish counties plus remote, hybrid, and nationwide style values, with Dublin and Wicklow selected by default. Clearing all locations shows every location. Note roles with a bare location like "Other" or "Ireland" are hidden until you clear the defaults or add more locations.
-* Source, work mode, and visibility selects narrow to Publicjobs or Activelink, remote or hybrid or on site, and active only or active plus hidden or hidden only.
+* Location chips include Irish counties plus remote, hybrid, and nationwide style values, with Dublin, Wicklow, and Remote selected by default. Clearing all locations shows every location. Note roles with a bare location like "Other" or "Ireland" are hidden until you clear the defaults or add more locations.
+* Source chips toggle Publicjobs, Activelink, and RoomPriceGenie in any combination. Clearing all sources shows every source. Work mode and visibility selects narrow to remote or hybrid or on site, and active only or active plus hidden or hidden only.
 * Min and max salary inputs filter by annual € equivalent. Hourly rates are annualised to full time (×2080 hours) and ranges match on overlap, so a €36–43K role still matches a €40K minimum. Roles with no parseable figure are hidden while a salary bound is set.
 * Each role card links out to the original posting and has a hide or unhide button. Hides apply instantly in the browser and persist in localStorage on top of the shared `config/hidden.json` base.
 * Salary is shown on the card when the advertiser publishes it. Activelink detail pages often include it; Publicjobs list and detail pages do not, so those cards show no salary line.

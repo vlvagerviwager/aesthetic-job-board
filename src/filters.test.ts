@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   isEffectivelyHidden,
+  matchesFilters,
   matchesKeyword,
   matchesLocation,
   normalizeSearchText,
@@ -8,6 +9,7 @@ import {
   sortNewestFirst,
   titleMentionsOrganisation,
 } from "./filters";
+import type { BoardFilters } from "./types";
 import type { JobListing } from "./types";
 
 function makeJob(overrides: Partial<JobListing> = {}): JobListing {
@@ -89,6 +91,30 @@ describe("titleMentionsOrganisation", () => {
         makeJob({ title: "Laboratory Manager", organisation: "Department of Agriculture" }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("matchesFilters", () => {
+  function baseFilters(): BoardFilters {
+    return {
+      keyword: "",
+      sources: [],
+      locations: [],
+      workMode: "all",
+      hidden: "active",
+      salaryMin: null,
+      salaryMax: null,
+    };
+  }
+
+  test("empty sources match every source", () => {
+    expect(matchesFilters(makeJob({ source: "roompricegenie" }), baseFilters(), {})).toBe(true);
+  });
+
+  test("selected sources narrow the list", () => {
+    const filters = { ...baseFilters(), sources: ["activelink", "roompricegenie"] as BoardFilters["sources"] };
+    expect(matchesFilters(makeJob({ source: "activelink" }), filters, {})).toBe(true);
+    expect(matchesFilters(makeJob({ source: "publicjobs" }), filters, {})).toBe(false);
   });
 });
 

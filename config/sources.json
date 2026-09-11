@@ -10,5 +10,11 @@
     "label": "Activelink",
     "boardUrl": "https://www.activelink.ie/vacancies",
     "notes": "No public JSON API found. Board is server rendered Drupal HTML. Build script parses article teasers at build time."
+  },
+  {
+    "id": "roompricegenie",
+    "label": "RoomPriceGenie",
+    "boardUrl": "https://roompricegenie.com/careers/#jobs",
+    "notes": "Ashby-hosted board. Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/roompricegenie)."
   }
 ]

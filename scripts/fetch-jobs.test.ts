@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   extractSalaryFromDetail,
+  mapAshbyPostingToListing,
   parseActivelinkDate,
   parsePublicjobsDate,
   resolvePublicjobsUrl,
@@ -45,6 +46,53 @@ describe("parseActivelinkDate", () => {
 
   test("falls back to now for empty input", () => {
     expect(Number.isNaN(Date.parse(parseActivelinkDate("")))).toBe(false);
+  });
+});
+
+describe("mapAshbyPostingToListing", () => {
+  test("maps a full posting", () => {
+    const listing = mapAshbyPostingToListing(
+      {
+        id: "1a8e6c59-9eb5-4d62-94f9-871fc9a7c0d4",
+        title: "Remote Head of UX (m/f/d)",
+        department: "Product & Engineering",
+        team: "Product & Engineering",
+        employmentType: "FullTime",
+        location: "Remote Germany",
+        secondaryLocations: [{ location: "Remote Portugal" }],
+        publishedAt: "2026-08-19T10:23:43.607+00:00",
+        jobUrl: "https://jobs.ashbyhq.com/roompricegenie/1a8e6c59",
+        compensationTierSummary: null,
+      },
+      "roompricegenie",
+      "RoomPriceGenie",
+    );
+    expect(listing?.id).toBe("roompricegenie-1a8e6c59");
+    expect(listing?.locationRaw).toBe("Remote Germany; Remote Portugal");
+    expect(listing?.workMode).toBe("remote");
+    expect(listing?.postedDate).toBe("2026-08-19T10:23:43.607Z");
+    expect(listing?.salary).toBe("");
+  });
+
+  test("falls back to Remote with no locations", () => {
+    const listing = mapAshbyPostingToListing(
+      { id: "abc", title: "Engineer", jobUrl: "https://example.com/j" },
+      "roompricegenie",
+      "RoomPriceGenie",
+    );
+    expect(listing?.locationRaw).toBe("Remote");
+  });
+
+  test("rejects postings missing id, title, or url", () => {
+    expect(mapAshbyPostingToListing({ title: "T", jobUrl: "https://example.com" }, "roompricegenie", "RPG")).toBeNull();
+    expect(mapAshbyPostingToListing({ id: "a", jobUrl: "https://example.com" }, "roompricegenie", "RPG")).toBeNull();
+    expect(mapAshbyPostingToListing({ id: "a", title: "T" }, "roompricegenie", "RPG")).toBeNull();
+  });
+
+  test("rejects unsafe urls", () => {
+    expect(
+      mapAshbyPostingToListing({ id: "a", title: "T", jobUrl: "javascript:alert(1)" }, "roompricegenie", "RPG"),
+    ).toBeNull();
   });
 });
 

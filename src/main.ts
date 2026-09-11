@@ -2,6 +2,7 @@ import {
   DATA_URL,
   DEFAULT_LOCATIONS,
   LOCATION_OPTIONS,
+  SOURCE_OPTIONS,
   THEME_DARK,
   THEME_LIGHT,
 } from "./constants";
@@ -25,7 +26,7 @@ import type {
   HiddenFilter,
   JobListing,
   JobsPayload,
-  SourceFilter,
+  SourceId,
   WorkModeFilter,
 } from "./types";
 import { workModeLabel } from "./workMode";
@@ -33,7 +34,7 @@ import { asSafeHttpUrl } from "./urls";
 
 const DEFAULT_FILTERS: BoardFilters = {
   keyword: "",
-  source: "all",
+  sources: [],
   locations: [...DEFAULT_LOCATIONS],
   workMode: "all",
   hidden: "active",
@@ -89,8 +90,40 @@ function formatDate(dateIso: string): string {
   });
 }
 
-function sourceLabel(source: string): string {
-  return source === "publicjobs" ? "publicjobs" : "activelink";
+function sourceLabel(source: SourceId): string {
+  if (source === "publicjobs") {
+    return "publicjobs";
+  }
+  if (source === "activelink") {
+    return "activelink";
+  }
+  return "roompricegenie";
+}
+
+function renderSourceChips(): void {
+  const chipsContainer = getElementByIdOrThrow("sourceChips");
+  chipsContainer.innerHTML = "";
+  for (const sourceOption of SOURCE_OPTIONS) {
+    const isPressed = boardState.filters.sources.includes(sourceOption);
+    const chipButton = document.createElement("button");
+    chipButton.type = "button";
+    chipButton.className = "chip";
+    chipButton.textContent = sourceLabel(sourceOption);
+    chipButton.setAttribute("aria-pressed", String(isPressed));
+    chipButton.addEventListener("click", () => {
+      const currentSources = boardState.filters.sources;
+      if (currentSources.includes(sourceOption)) {
+        boardState.filters.sources = currentSources.filter(
+          (keptSource) => keptSource !== sourceOption,
+        );
+      } else {
+        boardState.filters.sources = [...currentSources, sourceOption];
+      }
+      persistFiltersAndRender();
+      renderSourceChips();
+    });
+    chipsContainer.appendChild(chipButton);
+  }
 }
 
 function renderLocationChips(): void {
@@ -311,7 +344,6 @@ function persistFiltersAndRender(): void {
 
 function bindFilterControls(): void {
   const keywordInput = getElementByIdOrThrow("keywordInput") as HTMLInputElement;
-  const sourceSelect = getElementByIdOrThrow("sourceSelect") as HTMLSelectElement;
   const workModeSelect = getElementByIdOrThrow("workModeSelect") as HTMLSelectElement;
   const hiddenSelect = getElementByIdOrThrow("hiddenSelect") as HTMLSelectElement;
   const salaryMinInput = getElementByIdOrThrow("salaryMinInput") as HTMLInputElement;
@@ -319,7 +351,6 @@ function bindFilterControls(): void {
   const clearButton = getElementByIdOrThrow("clearFilters") as HTMLButtonElement;
 
   keywordInput.value = boardState.filters.keyword;
-  sourceSelect.value = boardState.filters.source;
   workModeSelect.value = boardState.filters.workMode;
   hiddenSelect.value = boardState.filters.hidden;
   syncSalaryInput(salaryMinInput, boardState.filters.salaryMin);
@@ -332,10 +363,6 @@ function bindFilterControls(): void {
       persistFiltersAndRender();
     }, KEYWORD_DEBOUNCE_MS),
   );
-  sourceSelect.addEventListener("change", () => {
-    boardState.filters.source = sourceSelect.value as SourceFilter;
-    persistFiltersAndRender();
-  });
   workModeSelect.addEventListener("change", () => {
     boardState.filters.workMode = workModeSelect.value as WorkModeFilter;
     persistFiltersAndRender();
@@ -363,7 +390,7 @@ function bindFilterControls(): void {
   clearButton.addEventListener("click", () => {
     boardState.filters = {
       keyword: "",
-      source: "all",
+      sources: [],
       locations: [...DEFAULT_LOCATIONS],
       workMode: "all",
       hidden: "active",
@@ -371,13 +398,13 @@ function bindFilterControls(): void {
       salaryMax: null,
     };
     keywordInput.value = "";
-    sourceSelect.value = "all";
     workModeSelect.value = "all";
     hiddenSelect.value = "active";
     syncSalaryInput(salaryMinInput, null);
     syncSalaryInput(salaryMaxInput, null);
     salaryRangeHint.hidden = true;
     persistFiltersAndRender();
+    renderSourceChips();
     renderLocationChips();
   });
 }
@@ -421,6 +448,7 @@ async function loadJobs(): Promise<void> {
 async function initBoard(): Promise<void> {
   bindThemeToggle();
   bindFilterControls();
+  renderSourceChips();
   renderLocationChips();
   await loadJobs();
 }

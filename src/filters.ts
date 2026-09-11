@@ -60,7 +60,7 @@ export function matchesFilters(
   if (filters.hidden === "hidden" && effectiveHidden === false) {
     return false;
   }
-  if (filters.source !== "all" && job.source !== filters.source) {
+  if (filters.sources.length > 0 && filters.sources.includes(job.source) === false) {
     return false;
   }
   if (filters.workMode !== "all" && job.workMode !== filters.workMode) {

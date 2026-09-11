@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { resolveBoardUrl } from "../src/urls";
+import { asSafeHttpUrl, resolveBoardUrl } from "../src/urls";
 import { detectWorkMode } from "../src/workMode";
 import type { JobListing, JobsPayload, SourceId } from "../src/types";
 
@@ -13,12 +13,16 @@ const SOURCES_CONFIG_PATH = "config/sources.json";
 const FALLBACK_PUBLICJOBS_BOARD_URL =
   "https://publicjobs.tal.net/vx/lang-en-GB/mobile-0/appcentre-ext/brand-4/xf-7ecb593daca6/candidate/jobboard/vacancy/3/adv/";
 const FALLBACK_ACTIVELINK_BOARD_URL = "https://www.activelink.ie/vacancies";
+const FALLBACK_ROOMPRICEGENIE_BOARD_URL = "https://roompricegenie.com/careers/#jobs";
 const ACTIVELINK_ORIGIN = "https://www.activelink.ie";
 
-async function readBoardUrls(): Promise<{ publicjobs: string; activelink: string }> {
-  const fallbackUrls = {
+type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie", string>;
+
+async function readBoardUrls(): Promise<BoardUrlSet> {
+  const fallbackUrls: BoardUrlSet = {
     publicjobs: FALLBACK_PUBLICJOBS_BOARD_URL,
     activelink: FALLBACK_ACTIVELINK_BOARD_URL,
+    roompricegenie: FALLBACK_ROOMPRICEGENIE_BOARD_URL,
   };
   try {
     const configFile = Bun.file(SOURCES_CONFIG_PATH);
@@ -31,7 +35,11 @@ async function readBoardUrls(): Promise<{ publicjobs: string; activelink: string
     }
     const resolvedUrls = { ...fallbackUrls };
     for (const sourceEntry of configuredSources) {
-      if (sourceEntry.id === "publicjobs" || sourceEntry.id === "activelink") {
+      if (
+        sourceEntry.id === "publicjobs" ||
+        sourceEntry.id === "activelink" ||
+        sourceEntry.id === "roompricegenie"
+      ) {
         if (typeof sourceEntry.boardUrl === "string" && sourceEntry.boardUrl !== "") {
           resolvedUrls[sourceEntry.id] = sourceEntry.boardUrl;
         }
@@ -282,6 +290,113 @@ async function enrichActivelinkSalaries(
     console.log(`Salary sample: ${salarySample}`);
   }
 }
+const ASHBY_POSTING_API_URL = "https://api.ashbyhq.com/posting-api/job-board";
+const ASHBY_BOARD_SLUGS: Record<string, string> = {
+  roompricegenie: "roompricegenie",
+};
+
+export interface AshbyJobPosting {
+  id?: string;
+  title?: string;
+  department?: string;
+  team?: string;
+  employmentType?: string;
+  location?: string;
+  secondaryLocations?: Array<{ location?: string }>;
+  publishedAt?: string;
+  jobUrl?: string;
+  compensationTierSummary?: string | null;
+}
+
+export function mapAshbyPostingToListing(
+  posting: AshbyJobPosting,
+  source: SourceId,
+  organisation: string,
+): JobListing | null {
+  const postingId = (posting.id ?? "").trim();
+  const titleText = (posting.title ?? "").replace(/\s+/g, " ").trim();
+  const detailUrl = (posting.jobUrl ?? "").trim();
+  if (postingId === "" || titleText === "" || detailUrl === "") {
+    return null;
+  }
+  const locationParts = [posting.location, ...(posting.secondaryLocations ?? []).map((entry) => entry.location)]
+    .map((part) => (part ?? "").replace(/\s+/g, " ").trim())
+    .filter((part) => part !== "");
+  const locationRaw = locationParts.length > 0 ? [...new Set(locationParts)].join("; ") : "Remote";
+  const summaryParts = [posting.team, posting.department, posting.employmentType]
+    .map((part) => (part ?? "").replace(/\s+/g, " ").trim())
+    .filter((part) => part !== "");
+  const summaryText = [...new Set(summaryParts)].join(" · ");
+  const safeUrl = asSafeHttpUrl(detailUrl, "");
+  if (safeUrl === "") {
+    return null;
+  }
+  const postedDate = parseAshbyDate(posting.publishedAt ?? "");
+  return {
+    id: `${source}-${postingId.slice(0, 8)}`,
+    source,
+    title: titleText,
+    url: safeUrl,
+    organisation,
+    locationRaw,
+    summary: summaryText === "" ? organisation : summaryText,
+    postedDate,
+    closingDate: postedDate,
+    workMode: detectWorkMode(locationRaw, titleText, summaryText),
+    hidden: false,
+    salary: (posting.compensationTierSummary ?? "").replace(/\s+/g, " ").trim(),
+  };
+}
+
+function parseAshbyDate(publishedAt: string): string {
+  const trimmedValue = publishedAt.trim();
+  if (trimmedValue === "") {
+    return new Date().toISOString();
+  }
+  const parsedDate = new Date(trimmedValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return new Date().toISOString();
+  }
+  return parsedDate.toISOString();
+}
+
+export async function fetchAshbyBoardListings(
+  source: SourceId,
+  organisation: string,
+  boardUrl: string,
+): Promise<JobListing[]> {
+  const orgSlug = ASHBY_BOARD_SLUGS[source];
+  if (orgSlug === undefined) {
+    throw new Error(`No Ashby organisation slug configured for source "${source}".`);
+  }
+  const apiUrl = `${ASHBY_POSTING_API_URL}/${orgSlug}`;
+  console.log(`Fetching ${source} jobs from Ashby API`);
+  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  let payload: { jobs?: AshbyJobPosting[] };
+  try {
+    payload = JSON.parse(responseText) as { jobs?: AshbyJobPosting[] };
+  } catch {
+    throw new Error(`Ashby API for ${source} did not return JSON (${apiUrl}). The board may have moved; check ${boardUrl}.`);
+  }
+  if (Array.isArray(payload.jobs) === false) {
+    throw new Error(`Ashby API for ${source} returned no job list (${apiUrl}). The board markup or API may have changed.`);
+  }
+  const collectedJobs: JobListing[] = [];
+  for (const posting of payload.jobs ?? []) {
+    const listing = mapAshbyPostingToListing(posting, source, organisation);
+    if (listing !== null) {
+      collectedJobs.push(listing);
+    }
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+  }
+  if (collectedJobs.length === 0) {
+    throw new Error(`Ashby API for ${source} returned no usable listings (${apiUrl}).`);
+  }
+  return collectedJobs;
+}
+
 function extractActivelinkSection(relativeHref: string): string {
   const sectionMatch = relativeHref.match(/^\/vacancies\/([^/?#]+)/);
   return sectionMatch?.[1] ?? "";
@@ -494,11 +609,12 @@ async function mainFetch(): Promise<void> {
   const boardUrls = await readBoardUrls();
   const previousSalaries = await readPreviousSalaries();
   const hiddenIds = await readHiddenIds();
-  const [publicjobsJobs, activelinkJobs] = await Promise.all([
+  const [publicjobsJobs, activelinkJobs, roompricegenieJobs] = await Promise.all([
     fetchPublicjobsListings(boardUrls.publicjobs),
     fetchActivelinkListings(boardUrls.activelink, previousSalaries),
+    fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
   ]);
-  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs].map((jobEntry) => ({
+  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs].map((jobEntry) => ({
     ...jobEntry,
     hidden: hiddenIds.has(jobEntry.id),
   }));
@@ -513,6 +629,7 @@ async function mainFetch(): Promise<void> {
     sources: [
       { id: "publicjobs" as SourceId, label: "Publicjobs", boardUrl: boardUrls.publicjobs },
       { id: "activelink" as SourceId, label: "Activelink", boardUrl: boardUrls.activelink },
+      { id: "roompricegenie" as SourceId, label: "RoomPriceGenie", boardUrl: boardUrls.roompricegenie },
     ],
     jobs: combinedJobs,
   };

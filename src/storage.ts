@@ -5,7 +5,7 @@ import {
   THEME_DARK,
   THEME_LIGHT,
 } from "./constants";
-import type { BoardFilters } from "./types";
+import type { BoardFilters, SourceId } from "./types";
 
 const THEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -20,7 +20,7 @@ export function readSalaryBound(rawValue: unknown, fallbackValue: number | null)
   return Math.floor(parsedValue);
 }
 
-const SOURCE_FILTER_VALUES: string[] = ["all", "publicjobs", "activelink"];
+const SOURCE_FILTER_VALUES: SourceId[] = ["publicjobs", "activelink", "roompricegenie"];
 const WORK_MODE_FILTER_VALUES: string[] = ["all", "remote", "hybrid", "onsite"];
 const HIDDEN_FILTER_VALUES: string[] = ["active", "all", "hidden"];
 
@@ -82,10 +82,11 @@ export function readStoredFilters(fallbackFilters: BoardFilters): BoardFilters {
     const parsedValue = JSON.parse(rawValue) as Partial<BoardFilters>;
     return {
       keyword: typeof parsedValue.keyword === "string" ? parsedValue.keyword : fallbackFilters.keyword,
-      source:
-        typeof parsedValue.source === "string" && SOURCE_FILTER_VALUES.includes(parsedValue.source)
-          ? parsedValue.source
-          : fallbackFilters.source,
+      sources: Array.isArray(parsedValue.sources)
+        ? parsedValue.sources.filter((entry): entry is SourceId =>
+            typeof entry === "string" && (SOURCE_FILTER_VALUES as string[]).includes(entry),
+          )
+        : fallbackFilters.sources,
       locations: Array.isArray(parsedValue.locations)
         ? parsedValue.locations.filter((entry): entry is string => typeof entry === "string")
         : fallbackFilters.locations,

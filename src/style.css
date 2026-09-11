@@ -409,6 +409,7 @@ body {
 
 .tag-source-publicjobs { background: var(--color-yellow); color: var(--color-ink); }
 .tag-source-activelink { background: var(--color-mint); color: var(--color-ink); }
+.tag-source-roompricegenie { background: var(--color-pink); color: var(--color-navy); }
 .tag-mode-remote { background: var(--color-mint); color: var(--color-ink); }
 .tag-mode-hybrid { background: var(--color-peach); color: var(--color-ink); }
 .tag-mode-onsite { background: var(--color-lavender); color: var(--color-ink); }
@@ -421,6 +422,7 @@ body {
 [data-theme="dark"] .tag-source-publicjobs { background: var(--color-yellow); color: #1e2450; border-color: var(--color-yellow); }
 [data-theme="dark"] .tag-source-activelink,
 [data-theme="dark"] .tag-mode-remote { background: var(--color-pink); color: #241f36; border-color: var(--color-pink); }
+[data-theme="dark"] .tag-source-roompricegenie { background: var(--color-pink); color: #241f36; border-color: var(--color-pink); }
 [data-theme="dark"] .tag-mode-hybrid { background: var(--color-peach); }
 [data-theme="dark"] .tag-mode-onsite { background: var(--color-lavender); }
 [data-theme="dark"] .tag-hidden { background: var(--color-red); border-color: var(--color-red); color: #241f36; }

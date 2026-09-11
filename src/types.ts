@@ -1,4 +1,4 @@
-export type SourceId = "publicjobs" | "activelink";
+export type SourceId = "publicjobs" | "activelink" | "roompricegenie";
 
 export type WorkMode = "remote" | "hybrid" | "onsite";
 
@@ -31,11 +31,9 @@ export type HiddenFilter = "active" | "hidden" | "all";
 
 export type WorkModeFilter = "all" | WorkMode;
 
-export type SourceFilter = "all" | SourceId;
-
 export interface BoardFilters {
   keyword: string;
-  source: SourceFilter;
+  sources: SourceId[];
   locations: string[];
   workMode: WorkModeFilter;
   hidden: HiddenFilter;
