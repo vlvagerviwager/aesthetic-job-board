@@ -92,12 +92,12 @@ function formatDate(dateIso: string): string {
 
 function sourceLabel(source: SourceId): string {
   if (source === "publicjobs") {
-    return "publicjobs";
+    return "Publicjobs";
   }
   if (source === "activelink") {
     return "activelink";
   }
-  return "roompricegenie";
+  return "RoomPriceGenie";
 }
 
 function renderSourceChips(): void {
