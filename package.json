@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.1.0",
-  "description": "Pastel retro job board aggregating publicjobs and activelink listings",
+  "description": "Pastel retro job board aggregating publicjobs, activelink, and roompricegenie listings",
   "scripts": {
     "dev": "vite",
     "dev:fetch": "bun run jobs:fetch && bun run dev",

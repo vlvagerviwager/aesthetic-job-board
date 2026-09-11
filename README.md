@@ -1,6 +1,6 @@
 # Aesthetic Job Board
 
-A front facing job board that pulls in roles I care about in an aesthetic pastel UI. It aggregates Irish Publicjobs and Activelink listings, always shows the most recently posted jobs first, and lets me hide roles, filter by hidden state, filter by location, search by keyword, and filter by remote, hybrid, or on site work mode.
+A front facing job board that pulls in roles I care about in an aesthetic pastel UI. It aggregates Irish Publicjobs, activelink, and RoomPriceGenie listings, always shows the most recently posted jobs first, and lets me hide roles, filter by hidden state, filter by location, search by keyword, and filter by remote, hybrid, or on site work mode.
 
 ![Screenshot of the aesthetic job board](docs/aesthetic-job-board.webp)
 
@@ -36,7 +36,7 @@ Requires Bun 1.0 or newer. Tested in Firefox with support for other modern brows
 
 ## Job sources
 
-Two configured sources in `config/sources.json`: Publicjobs (`publicjobs.tal.net` job board) and Activelink (`activelink.ie` vacancies), plus RoomPriceGenie (`roompricegenie.com/careers`). No public JSON APIs were found for either Irish board, so `scripts/fetch-jobs.ts` parses the server rendered HTML list pages at build time (Oleeo Solr HTML for Publicjobs, Drupal teasers for Activelink). RoomPriceGenie is Ashby-hosted and read from the public Ashby posting API. Everything is written to `public/data/jobs.json` sorted newest first.
+Three configured sources in `config/sources.json`: Publicjobs (`publicjobs.tal.net` job board), Activelink (`activelink.ie` vacancies), plus RoomPriceGenie (`roompricegenie.com/careers`). No public JSON APIs were found for either Irish board, so `scripts/fetch-jobs.ts` parses the server rendered HTML list pages at build time (Oleeo Solr HTML for Publicjobs, Drupal teasers for Activelink). RoomPriceGenie is Ashby-hosted and read from the public Ashby posting API. Everything is written to `public/data/jobs.json` sorted newest first.
 
 Shared hidden roles live in `config/hidden.json`. To hide a role for everyone, find its id in `public/data/jobs.json` (for example `publicjobs-8486` or `activelink-127885`), then run `bun run jobs:hide -- --id <job-id>` and commit the updated config. Run with `--unhide` to remove it. The command validates the id against the latest fetched listings and refuses unknown ids. A daily GitHub Actions workflow refetches listings, typechecks, builds, and commits updated data.
 
@@ -57,7 +57,7 @@ Board URLs live in `config/sources.json`, which `scripts/fetch-jobs.ts` reads at
 
 * `bun run dev` - start the dev server
 * `bun run dev:fetch` - fetch fresh listings, then start the dev server
-* `bun run jobs:fetch` - fetch both boards and write `public/data/jobs.json`
+* `bun run jobs:fetch` - fetch all boards and write `public/data/jobs.json`
 * `bun run jobs:hide -- --id <job-id>` - hide a role in `config/hidden.json`, add `--unhide` to remove, use `--list` to show all hidden ids
 * `bun run test` - run unit tests
 * `bun run build` - fetch jobs and build for production
