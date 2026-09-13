@@ -15,42 +15,59 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  refresh:
+  fetch-and-commit:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
       - run: bun run jobs:fetch
-      - run: bun run typecheck
-      - run: bun run build:offline
-      - name: commit fresh jobs data
+      - name: Check for changes
+        id: check
         run: |
-          if git status --porcelain public/data/jobs.json | grep -q .; then
-            git config user.name "jobs-bot"
-            git config user.email "jobs-bot@users.noreply.github.com"
-            git add public/data/jobs.json
-            git commit -m "chore: refresh jobs data"
-            git push
+          if git diff --quiet -- public/data/jobs.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No job changes"
           else
-            echo "No job changes."
+            echo "changed=true" >> $GITHUB_OUTPUT
+            git diff --stat -- public/data/jobs.json
           fi
+      - name: Commit and push if changed
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/jobs.json
+          git commit -m "chore: refresh jobs data"
+          git push
 
   deploy:
-    needs: refresh
+    needs: fetch-and-commit
+    if: needs.fetch-and-commit.outputs.changed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
       - run: bun run build:offline
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: dist
