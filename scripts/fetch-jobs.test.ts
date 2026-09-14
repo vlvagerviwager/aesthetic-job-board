@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 import {
   extractSalaryFromDetail,
   mapAshbyPostingToListing,
+  mapGreenhouseJobToListing,
   parseActivelinkDate,
+  parseDrccPage,
   parsePublicjobsDate,
+  parseRisePage,
   resolvePublicjobsUrl,
 } from "./fetch-jobs";
 
@@ -123,5 +126,68 @@ describe("extractSalaryFromDetail", () => {
 
   test("returns empty string when no salary present", () => {
     expect(extractSalaryFromDetail(`<div><p>Great role, apply now</p></div>`)).toBe("");
+  });
+});
+
+describe("mapGreenhouseJobToListing", () => {
+  test("maps a full Greenhouse job", () => {
+    const listing = mapGreenhouseJobToListing(
+      {
+        id: 7657434003,
+        title: "Application Security Engineer",
+        absolute_url: "https://job-boards.greenhouse.io/pokemoncareers/jobs/7657434003",
+        location: { name: "London, England, United Kingdom" },
+        updated_at: "2026-07-15T17:08:28-04:00",
+        first_published: "2026-03-10T11:35:39-04:00",
+      },
+      "pokemon",
+      "The Pokémon Company International",
+    );
+    expect(listing?.id).toBe("pokemon-76574340");
+    expect(listing?.title).toBe("Application Security Engineer");
+    expect(listing?.locationRaw).toBe("London, England, United Kingdom");
+    expect(listing?.organisation).toBe("The Pokémon Company International");
+  });
+
+  test("rejects jobs missing id, title, or url", () => {
+    expect(mapGreenhouseJobToListing({ id: 0, title: "", absolute_url: "", location: { name: "" }, updated_at: "", first_published: "" }, "pokemon", "P")).toBeNull();
+  });
+});
+
+describe("parseDrccPage", () => {
+  test("extracts DRCC vacancies", () => {
+    const html = `<html><body><div id="content">
+      <h3>Crisis Support Therapist</h3>
+      <ul><li><strong>Location:</strong> Dublin</li></ul>
+      <p><strong>Salary:</strong> €58,958 per annum</p>
+      <p>19th June 2026 @ COB</p>
+    </div></body></html>`;
+    const jobs = parseDrccPage(html, "https://www.drcc.ie/about/vacancies/");
+    expect(jobs.length).toBeGreaterThanOrEqual(1);
+    expect(jobs[0]?.organisation).toBe("Dublin Rape Crisis Centre");
+  });
+
+  test("returns empty array when no vacancies found", () => {
+    const html = `<html><body><div id="content"><p>No current vacancies.</p></div></body></html>`;
+    expect(parseDrccPage(html, "https://www.drcc.ie/about/vacancies/")).toHaveLength(0);
+  });
+});
+
+describe("parseRisePage", () => {
+  test("extracts RISE vacancies from PDF links", () => {
+    const html = `<html><body><div class="bde-rich-text-396-105">
+      <ul><li><a href="/wp-content/uploads/2026/06/Play-Therapist-Vacancy-2026-06.pdf" target="_blank"><strong>Play Therapist €80 per session (closing date 1st August, 2026)</strong></a></li></ul>
+    </div></body></html>`;
+    const jobs = parseRisePage(html, "https://risecounselling.ie/vacancies/");
+    expect(jobs.length).toBe(1);
+    expect(jobs[0]?.title).toBe("Play Therapist");
+    expect(jobs[0]?.organisation).toBe("RISE Counselling");
+    expect(jobs[0]?.salary).toBe("€80 per session");
+    expect(jobs[0]?.locationRaw).toBe("Kilcoole, Co. Wicklow");
+  });
+
+  test("returns empty array when no vacancies found", () => {
+    const html = `<html><body><div class="bde-rich-text-396-105"><p>No current vacancies.</p></div></body></html>`;
+    expect(parseRisePage(html, "https://risecounselling.ie/vacancies/")).toHaveLength(0);
   });
 });

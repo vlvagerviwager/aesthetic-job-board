@@ -16,5 +16,23 @@
     "label": "RoomPriceGenie",
     "boardUrl": "https://roompricegenie.com/careers/#jobs",
     "notes": "Ashby-hosted board. Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/roompricegenie)."
+  },
+  {
+    "id": "pokemon",
+    "label": "Pokemon",
+    "boardUrl": "https://job-boards.greenhouse.io/pokemoncareers",
+    "notes": "Greenhouse-hosted board. Build script reads the public Greenhouse boards API (boards-api.greenhouse.io/v1/boards/pokemoncareers/jobs)."
+  },
+  {
+    "id": "drcc",
+    "label": "DRCC",
+    "boardUrl": "https://www.drcc.ie/about/vacancies/",
+    "notes": "Static HTML page. Build script scrapes the vacancies page for current job listings."
+  },
+  {
+    "id": "rise",
+    "label": "RISE Counselling",
+    "boardUrl": "https://risecounselling.ie/vacancies/",
+    "notes": "WordPress site with vacancies on a static page. Build script scrapes the vacancies page for current job listings."
   }
 ]

@@ -9,7 +9,7 @@ export const THEME_DARK = "dark";
 
 export const DEFAULT_LOCATIONS: string[] = ["Dublin", "Wicklow", "Remote"];
 
-export const SOURCE_OPTIONS: SourceId[] = ["publicjobs", "activelink", "roompricegenie"];
+export const SOURCE_OPTIONS: SourceId[] = ["publicjobs", "activelink", "roompricegenie", "pokemon", "drcc", "rise"];
 
 export const LOCATION_OPTIONS: string[] = [
   "Dublin",

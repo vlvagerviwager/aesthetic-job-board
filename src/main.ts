@@ -97,7 +97,16 @@ function sourceLabel(source: SourceId): string {
   if (source === "activelink") {
     return "activelink";
   }
-  return "RoomPriceGenie";
+  if (source === "roompricegenie") {
+    return "RoomPriceGenie";
+  }
+  if (source === "pokemon") {
+    return "Pokemon";
+  }
+  if (source === "drcc") {
+    return "DRCC";
+  }
+  return "RISE Counselling";
 }
 
 function renderSourceChips(): void {

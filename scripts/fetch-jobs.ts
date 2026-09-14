@@ -14,15 +14,21 @@ const FALLBACK_PUBLICJOBS_BOARD_URL =
   "https://publicjobs.tal.net/vx/lang-en-GB/mobile-0/appcentre-ext/brand-4/xf-7ecb593daca6/candidate/jobboard/vacancy/3/adv/";
 const FALLBACK_ACTIVELINK_BOARD_URL = "https://www.activelink.ie/vacancies";
 const FALLBACK_ROOMPRICEGENIE_BOARD_URL = "https://roompricegenie.com/careers/#jobs";
+const FALLBACK_POKEMON_BOARD_URL = "https://job-boards.greenhouse.io/pokemoncareers";
+const FALLBACK_DRCC_BOARD_URL = "https://www.drcc.ie/about/vacancies/";
+const FALLBACK_RISE_BOARD_URL = "https://risecounselling.ie/vacancies/";
 const ACTIVELINK_ORIGIN = "https://www.activelink.ie";
 
-type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie", string>;
+type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise", string>;
 
 async function readBoardUrls(): Promise<BoardUrlSet> {
   const fallbackUrls: BoardUrlSet = {
     publicjobs: FALLBACK_PUBLICJOBS_BOARD_URL,
     activelink: FALLBACK_ACTIVELINK_BOARD_URL,
     roompricegenie: FALLBACK_ROOMPRICEGENIE_BOARD_URL,
+    pokemon: FALLBACK_POKEMON_BOARD_URL,
+    drcc: FALLBACK_DRCC_BOARD_URL,
+    rise: FALLBACK_RISE_BOARD_URL,
   };
   try {
     const configFile = Bun.file(SOURCES_CONFIG_PATH);
@@ -38,7 +44,10 @@ async function readBoardUrls(): Promise<BoardUrlSet> {
       if (
         sourceEntry.id === "publicjobs" ||
         sourceEntry.id === "activelink" ||
-        sourceEntry.id === "roompricegenie"
+        sourceEntry.id === "roompricegenie" ||
+        sourceEntry.id === "pokemon" ||
+        sourceEntry.id === "drcc" ||
+        sourceEntry.id === "rise"
       ) {
         if (typeof sourceEntry.boardUrl === "string" && sourceEntry.boardUrl !== "") {
           resolvedUrls[sourceEntry.id] = sourceEntry.boardUrl;
@@ -85,18 +94,29 @@ const DETAIL_PROGRESS_LOG_EVERY = 50;
 
 const MONTH_LOOKUP: Record<string, string> = {
   jan: "01",
+  january: "01",
   feb: "02",
+  february: "02",
   mar: "03",
+  march: "03",
   apr: "04",
+  april: "04",
   may: "05",
   jun: "06",
+  june: "06",
   jul: "07",
+  july: "07",
   aug: "08",
+  august: "08",
   sep: "09",
   sept: "09",
+  september: "09",
   oct: "10",
+  october: "10",
   nov: "11",
+  november: "11",
   dec: "12",
+  december: "12",
 };
 
 function sleepMilliseconds(delayMs: number): Promise<void> {
@@ -397,6 +417,183 @@ export async function fetchAshbyBoardListings(
   return collectedJobs;
 }
 
+const GREENHOUSE_API_URL = "https://boards-api.greenhouse.io/v1/boards";
+
+export interface GreenhouseJob {
+  id: number;
+  title: string;
+  absolute_url: string;
+  location: { name: string };
+  updated_at: string;
+  first_published: string;
+}
+
+export function mapGreenhouseJobToListing(
+  job: GreenhouseJob,
+  source: SourceId,
+  organisation: string,
+): JobListing | null {
+  const jobId = String(job.id).trim();
+  const titleText = (job.title ?? "").replace(/\s+/g, " ").trim();
+  const detailUrl = (job.absolute_url ?? "").trim();
+  if (jobId === "" || titleText === "" || detailUrl === "") {
+    return null;
+  }
+  const safeUrl = asSafeHttpUrl(detailUrl, "");
+  if (safeUrl === "") {
+    return null;
+  }
+  const locationRaw = (job.location?.name ?? "").replace(/\s+/g, " ").trim() || "Remote";
+  const postedDate = parseAshbyDate(job.first_published ?? job.updated_at ?? "");
+  return {
+    id: `${source}-${jobId.slice(0, 8)}`,
+    source,
+    title: titleText,
+    url: safeUrl,
+    organisation,
+    locationRaw,
+    summary: organisation,
+    postedDate,
+    closingDate: postedDate,
+    workMode: detectWorkMode(locationRaw, titleText, ""),
+    hidden: false,
+    salary: "",
+  };
+}
+
+export async function fetchGreenhouseBoardListings(
+  source: SourceId,
+  organisation: string,
+  boardUrl: string,
+): Promise<JobListing[]> {
+  const boardSlug = source === "pokemon" ? "pokemoncareers" : source;
+  const apiUrl = `${GREENHOUSE_API_URL}/${boardSlug}/jobs`;
+  console.log(`Fetching ${source} jobs from Greenhouse API`);
+  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  let payload: { jobs?: GreenhouseJob[] };
+  try {
+    payload = JSON.parse(responseText) as { jobs?: GreenhouseJob[] };
+  } catch {
+    throw new Error(`Greenhouse API for ${source} did not return JSON (${apiUrl}). The board may have moved; check ${boardUrl}.`);
+  }
+  if (Array.isArray(payload.jobs) === false) {
+    throw new Error(`Greenhouse API for ${source} returned no job list (${apiUrl}).`);
+  }
+  const collectedJobs: JobListing[] = [];
+  for (const job of payload.jobs ?? []) {
+    const listing = mapGreenhouseJobToListing(job, source, organisation);
+    if (listing !== null) {
+      collectedJobs.push(listing);
+    }
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+  }
+  if (collectedJobs.length === 0) {
+    throw new Error(`Greenhouse API for ${source} returned no usable listings (${apiUrl}).`);
+  }
+  return collectedJobs;
+}
+
+export function parseDrccPage(html: string, boardUrl: string): JobListing[] {
+  const root = cheerio.load(html);
+  const jobs: JobListing[] = [];
+  const contentText = root("#content").text();
+  const salaryMatch = contentText.match(/Salary:\s*€([\d,]+)/i);
+  const salary = salaryMatch?.[1] ? `€${salaryMatch[1]} per annum` : "";
+  const locationMatch = contentText.match(/Location:\s*([^.]+)/i);
+  const locationRaw = locationMatch?.[1]?.replace(/\s+/g, " ").trim() || "Dublin";
+  const deadlineMatch = contentText.match(/(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})\s*@\s*COB/i);
+  const closingText = deadlineMatch?.[1]?.replace(/(st|nd|rd|th)/g, "").trim() ?? "";
+  const closingDate = closingText !== "" ? parsePublicjobsDate(closingText) : new Date().toISOString();
+  const seenTitles = new Set<string>();
+  root("h3").each((_i, el) => {
+    const h3Text = root(el).text().replace(/\s+/g, " ").trim();
+    if (h3Text === "" || seenTitles.has(h3Text.toLowerCase())) {
+      return;
+    }
+    const isJobTitle = /(?:Crisis Support|Counsellor|Therapist|Coordinator|Manager|Officer|Administrator|Assistant|Worker|Advocate|Specialist)/i.test(h3Text);
+    if (!isJobTitle) {
+      return;
+    }
+    seenTitles.add(h3Text.toLowerCase());
+    const linkEl = root(el).find("a").first();
+    const href = linkEl.attr("href") ?? "";
+    const jobUrl = href !== "" ? new URL(href, boardUrl).toString() : boardUrl;
+    jobs.push({
+      id: `drcc-${h3Text.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`,
+      source: "drcc",
+      title: h3Text,
+      url: jobUrl,
+      organisation: "Dublin Rape Crisis Centre",
+      locationRaw,
+      summary: `Dublin Rape Crisis Centre · ${locationRaw}`,
+      postedDate: closingDate,
+      closingDate,
+      workMode: detectWorkMode(locationRaw, h3Text, ""),
+      hidden: false,
+      salary,
+    });
+  });
+  return jobs;
+}
+
+export async function fetchDrccListings(boardUrl: string): Promise<JobListing[]> {
+  console.log("Fetching DRCC vacancies page");
+  const html = await fetchHtmlWithTimeout(boardUrl);
+  const jobs = parseDrccPage(html, boardUrl);
+  if (jobs.length === 0) {
+    console.log("DRCC page returned no parseable vacancies — site may have changed or no current openings.");
+  }
+  return jobs;
+}
+
+export function parseRisePage(html: string, boardUrl: string): JobListing[] {
+  const root = cheerio.load(html);
+  const jobs: JobListing[] = [];
+  const contentHtml = root(".bde-rich-text-396-105, .bde-rich-text").html() ?? "";
+  const linkPattern = /href="([^"]*\.pdf[^"]*)"[^>]*><strong>([^<]+)<\/strong>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = linkPattern.exec(contentHtml)) !== null) {
+    const pdfHref = match[1] ?? "";
+    const rawTitle = (match[2] ?? "").replace(/\s+/g, " ").trim();
+    const titleMatch = rawTitle.match(/^(.*?)(?:\s*€[\d,]+(?:\s*per session)?)?(?:\s*\(closing date[^)]*\))?$/i);
+    const title = titleMatch?.[1]?.trim() ?? rawTitle;
+    const salaryMatch = rawTitle.match(/€([\d,]+(?:\s*per\s*\w+)?)/i);
+    const salary = salaryMatch?.[0] ?? "";
+    const closingMatch = rawTitle.match(/closing date\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)[\s,]*(\d{4})/i);
+    const closingText = closingMatch ? `${closingMatch[1]} ${closingMatch[2]} ${closingMatch[3]}` : "";
+    const closingDate = closingText !== "" ? parsePublicjobsDate(closingText) : new Date().toISOString();
+    const jobUrl = pdfHref.startsWith("http") ? pdfHref : new URL(pdfHref, boardUrl).toString();
+    const locationRaw = "Kilcoole, Co. Wicklow";
+    jobs.push({
+      id: `rise-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`,
+      source: "rise",
+      title,
+      url: jobUrl,
+      organisation: "RISE Counselling",
+      locationRaw,
+      summary: `RISE Counselling · ${locationRaw}`,
+      postedDate: closingDate,
+      closingDate,
+      workMode: detectWorkMode(locationRaw, title, ""),
+      hidden: false,
+      salary,
+    });
+  }
+  return jobs;
+}
+
+export async function fetchRiseListings(boardUrl: string): Promise<JobListing[]> {
+  console.log("Fetching RISE Counselling vacancies page");
+  const html = await fetchHtmlWithTimeout(boardUrl);
+  const jobs = parseRisePage(html, boardUrl);
+  if (jobs.length === 0) {
+    console.log("RISE page returned no parseable vacancies — site may have changed or no current openings.");
+  }
+  return jobs;
+}
+
 function extractActivelinkSection(relativeHref: string): string {
   const sectionMatch = relativeHref.match(/^\/vacancies\/([^/?#]+)/);
   return sectionMatch?.[1] ?? "";
@@ -609,12 +806,15 @@ async function mainFetch(): Promise<void> {
   const boardUrls = await readBoardUrls();
   const previousSalaries = await readPreviousSalaries();
   const hiddenIds = await readHiddenIds();
-  const [publicjobsJobs, activelinkJobs, roompricegenieJobs] = await Promise.all([
+  const [publicjobsJobs, activelinkJobs, roompricegenieJobs, pokemonJobs, drccJobs, riseJobs] = await Promise.all([
     fetchPublicjobsListings(boardUrls.publicjobs),
     fetchActivelinkListings(boardUrls.activelink, previousSalaries),
     fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
+    fetchGreenhouseBoardListings("pokemon", "The Pokémon Company International", boardUrls.pokemon),
+    fetchDrccListings(boardUrls.drcc),
+    fetchRiseListings(boardUrls.rise),
   ]);
-  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs].map((jobEntry) => ({
+  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs, ...pokemonJobs, ...drccJobs, ...riseJobs].map((jobEntry) => ({
     ...jobEntry,
     hidden: hiddenIds.has(jobEntry.id),
   }));
@@ -630,6 +830,9 @@ async function mainFetch(): Promise<void> {
       { id: "publicjobs" as SourceId, label: "Publicjobs", boardUrl: boardUrls.publicjobs },
       { id: "activelink" as SourceId, label: "Activelink", boardUrl: boardUrls.activelink },
       { id: "roompricegenie" as SourceId, label: "RoomPriceGenie", boardUrl: boardUrls.roompricegenie },
+      { id: "pokemon" as SourceId, label: "Pokemon", boardUrl: boardUrls.pokemon },
+      { id: "drcc" as SourceId, label: "DRCC", boardUrl: boardUrls.drcc },
+      { id: "rise" as SourceId, label: "RISE Counselling", boardUrl: boardUrls.rise },
     ],
     jobs: combinedJobs,
   };
