@@ -138,6 +138,10 @@ body {
   background: var(--color-yellow);
 }
 
+.filters.is-collapsed .filters-body {
+  display: none;
+}
+
 [data-theme="dark"] .titlebar {
   background: var(--color-pink-pale);
 }

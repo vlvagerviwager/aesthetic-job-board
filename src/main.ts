@@ -445,12 +445,47 @@ async function loadJobs(): Promise<void> {
   renderJobs();
 }
 
+export function applyFiltersExpanded(
+  section: HTMLElement,
+  toggle: HTMLButtonElement,
+  expanded: boolean,
+): void {
+  section.classList.toggle("is-collapsed", !expanded);
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.textContent = expanded ? "hide" : "show";
+}
+
+function bindFiltersCollapse(): void {
+  const section = document.querySelector<HTMLElement>("section.filters");
+  const toggle = document.getElementById("filtersToggle") as HTMLButtonElement | null;
+  if (!section || !toggle) {
+    return;
+  }
+
+  const mql = window.matchMedia("(min-width: 981px)");
+
+  toggle.addEventListener("click", () => {
+    const expanded = section.classList.contains("is-collapsed");
+    applyFiltersExpanded(section, toggle, expanded);
+  });
+
+  const syncOpen = (): void => {
+    applyFiltersExpanded(section, toggle, mql.matches);
+  };
+
+  syncOpen();
+  mql.addEventListener("change", syncOpen);
+}
+
 async function initBoard(): Promise<void> {
   bindThemeToggle();
   bindFilterControls();
+  bindFiltersCollapse();
   renderSourceChips();
   renderLocationChips();
   await loadJobs();
 }
 
-void initBoard();
+if (typeof document !== "undefined") {
+  void initBoard();
+}
