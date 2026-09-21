@@ -17,9 +17,14 @@ const FALLBACK_ROOMPRICEGENIE_BOARD_URL = "https://roompricegenie.com/careers/#j
 const FALLBACK_POKEMON_BOARD_URL = "https://job-boards.greenhouse.io/pokemoncareers";
 const FALLBACK_DRCC_BOARD_URL = "https://www.drcc.ie/about/vacancies/";
 const FALLBACK_RISE_BOARD_URL = "https://risecounselling.ie/vacancies/";
+const FALLBACK_TEM_BOARD_URL = "https://jobs.ashbyhq.com/tem";
+const FALLBACK_FEELD_BOARD_URL = "https://feeld.co/careers";
+const FALLBACK_REAP_BOARD_URL = "https://careers.reap.global/jobs";
+const FALLBACK_CODER_BOARD_URL = "https://jobs.ashbyhq.com/Coder";
+const FALLBACK_COREWEAVE_BOARD_URL = "https://www.coreweave.com/careers/eu";
 const ACTIVELINK_ORIGIN = "https://www.activelink.ie";
 
-type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise", string>;
+type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise" | "tem" | "feeld" | "reap" | "coder" | "coreweave", string>;
 
 async function readBoardUrls(): Promise<BoardUrlSet> {
   const fallbackUrls: BoardUrlSet = {
@@ -29,6 +34,11 @@ async function readBoardUrls(): Promise<BoardUrlSet> {
     pokemon: FALLBACK_POKEMON_BOARD_URL,
     drcc: FALLBACK_DRCC_BOARD_URL,
     rise: FALLBACK_RISE_BOARD_URL,
+    tem: FALLBACK_TEM_BOARD_URL,
+    feeld: FALLBACK_FEELD_BOARD_URL,
+    reap: FALLBACK_REAP_BOARD_URL,
+    coder: FALLBACK_CODER_BOARD_URL,
+    coreweave: FALLBACK_COREWEAVE_BOARD_URL,
   };
   try {
     const configFile = Bun.file(SOURCES_CONFIG_PATH);
@@ -47,7 +57,12 @@ async function readBoardUrls(): Promise<BoardUrlSet> {
         sourceEntry.id === "roompricegenie" ||
         sourceEntry.id === "pokemon" ||
         sourceEntry.id === "drcc" ||
-        sourceEntry.id === "rise"
+        sourceEntry.id === "rise" ||
+        sourceEntry.id === "tem" ||
+        sourceEntry.id === "feeld" ||
+        sourceEntry.id === "reap" ||
+        sourceEntry.id === "coder" ||
+        sourceEntry.id === "coreweave"
       ) {
         if (typeof sourceEntry.boardUrl === "string" && sourceEntry.boardUrl !== "") {
           resolvedUrls[sourceEntry.id] = sourceEntry.boardUrl;
@@ -313,6 +328,8 @@ async function enrichActivelinkSalaries(
 const ASHBY_POSTING_API_URL = "https://api.ashbyhq.com/posting-api/job-board";
 const ASHBY_BOARD_SLUGS: Record<string, string> = {
   roompricegenie: "roompricegenie",
+  tem: "tem",
+  coder: "Coder",
 };
 
 export interface AshbyJobPosting {
@@ -781,6 +798,147 @@ async function fetchActivelinkListings(
   return collectedJobs;
 }
 
+function stripHtmlTags(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/&[^;]+;/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export async function fetchReapListings(boardUrl: string): Promise<JobListing[]> {
+  const apiUrl = "https://careers.reap.global/jobs.json";
+  console.log(`Fetching Reap jobs from ${apiUrl}`);
+  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  let payload: { items?: Array<{ id?: string; title?: string; url?: string; date_published?: string; content_html?: string }> };
+  try {
+    payload = JSON.parse(responseText) as typeof payload;
+  } catch {
+    throw new Error(`Reap API did not return JSON (${apiUrl}). The feed may have moved; check ${boardUrl}.`);
+  }
+  if (Array.isArray(payload.items) === false || payload.items.length === 0) {
+    throw new Error(`Reap API returned no items (${apiUrl}).`);
+  }
+  const collectedJobs: JobListing[] = [];
+  for (const item of payload.items) {
+    if (!item.title || !item.url) {
+      continue;
+    }
+    const description = item.content_html ? stripHtmlTags(item.content_html) : "";
+    const salaryMatch = description.match(/(?:salary|compensation)[:\s]*([€£$][\d,.\s-]+(?:per\s+(?:annum|month|hour|year))?)/i);
+    collectedJobs.push({
+      id: `reap-${item.id ?? item.url.split("/").pop() ?? Date.now()}`,
+      source: "reap",
+      title: item.title,
+      url: item.url,
+      organisation: "",
+      locationRaw: "",
+      summary: description,
+      salary: salaryMatch?.[1] ?? "",
+      postedDate: item.date_published ? new Date(item.date_published).toISOString() : new Date().toISOString(),
+      closingDate: "",
+      workMode: "onsite" as const,
+      hidden: false,
+    });
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+  }
+  if (collectedJobs.length === 0) {
+    throw new Error(`Reap API returned no usable listings (${apiUrl}).`);
+  }
+  return collectedJobs;
+}
+
+export async function fetchFeeldListings(boardUrl: string): Promise<JobListing[]> {
+  console.log(`Fetching Feeld jobs from ${boardUrl}`);
+  const html = await fetchHtmlWithTimeout(boardUrl);
+  const root = cheerio.load(html);
+  const jobUrls: string[] = [];
+  root("a[href*='feeldco.workable.com/jobs/']").each((_index, element) => {
+    const href = root(element).attr("href") ?? "";
+    if (href && !jobUrls.includes(href)) {
+      jobUrls.push(href);
+    }
+  });
+  if (jobUrls.length === 0) {
+    throw new Error(`Feeld page returned no usable listings (${boardUrl}).`);
+  }
+  const collectedJobs: JobListing[] = [];
+  for (const jobUrl of jobUrls) {
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+    try {
+      const detailHtml = await fetchHtmlWithTimeout(jobUrl);
+      const titleMatch = detailHtml.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/i);
+      const title = titleMatch?.[1]?.replace(/ - Feeld$/, "").trim() ?? "";
+      if (!title) {
+        continue;
+      }
+      const descMatch = detailHtml.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i);
+      const description = descMatch?.[1] ?? "";
+      collectedJobs.push({
+        id: `feeld-${jobUrl.split("/").pop() ?? Date.now()}`,
+        source: "feeld",
+        title,
+        url: jobUrl,
+        organisation: "",
+        locationRaw: "",
+        summary: description,
+        salary: "",
+        postedDate: new Date().toISOString(),
+        closingDate: "",
+        workMode: "onsite" as const,
+        hidden: false,
+      });
+    } catch (error) {
+      console.warn(`Could not fetch Feeld detail page ${jobUrl}`, error);
+    }
+    await sleepMilliseconds(DELAY_BETWEEN_PAGES_MS);
+  }
+  if (collectedJobs.length === 0) {
+    throw new Error(`Feeld page returned no usable listings (${boardUrl}).`);
+  }
+  return collectedJobs;
+}
+
+const COREWEAVE_ALLOWED_LOCATIONS = ["dublin", "ireland", "emea", "europe"];
+
+export async function fetchCoreweaveListings(
+  source: SourceId,
+  organisation: string,
+  boardUrl: string,
+): Promise<JobListing[]> {
+  const apiUrl = `${GREENHOUSE_API_URL}/coreweaveu/jobs`;
+  console.log(`Fetching CoreWeave jobs from Greenhouse API`);
+  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  let payload: { jobs?: GreenhouseJob[] };
+  try {
+    payload = JSON.parse(responseText) as { jobs?: GreenhouseJob[] };
+  } catch {
+    throw new Error(`CoreWeave API did not return JSON (${apiUrl}). The board may have moved; check ${boardUrl}.`);
+  }
+  if (Array.isArray(payload.jobs) === false) {
+    throw new Error(`CoreWeave API returned no job list (${apiUrl}).`);
+  }
+  const collectedJobs: JobListing[] = [];
+  for (const job of payload.jobs ?? []) {
+    const locationName = (job.location?.name ?? "").toLowerCase();
+    const isAllowed = COREWEAVE_ALLOWED_LOCATIONS.some((allowed) => locationName.includes(allowed));
+    if (!isAllowed) {
+      continue;
+    }
+    const listing = mapGreenhouseJobToListing(job, source, organisation);
+    if (listing !== null) {
+      collectedJobs.push(listing);
+    }
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+  }
+  if (collectedJobs.length === 0) {
+    throw new Error(`CoreWeave API returned no Ireland/EMEA listings (${apiUrl}).`);
+  }
+  return collectedJobs;
+}
+
 async function readHiddenIds(): Promise<Set<string>> {
   try {
     const hiddenFile = Bun.file(HIDDEN_CONFIG_PATH);
@@ -800,21 +958,26 @@ async function readHiddenIds(): Promise<Set<string>> {
   }
 }
 
-const MIN_EXPECTED_JOBS = 50;
+const MIN_EXPECTED_JOBS = 80;
 
 async function mainFetch(): Promise<void> {
   const boardUrls = await readBoardUrls();
   const previousSalaries = await readPreviousSalaries();
   const hiddenIds = await readHiddenIds();
-  const [publicjobsJobs, activelinkJobs, roompricegenieJobs, pokemonJobs, drccJobs, riseJobs] = await Promise.all([
+  const [publicjobsJobs, activelinkJobs, roompricegenieJobs, pokemonJobs, drccJobs, riseJobs, temJobs, feeldJobs, reapJobs, coderJobs, coreweaveJobs] = await Promise.all([
     fetchPublicjobsListings(boardUrls.publicjobs),
     fetchActivelinkListings(boardUrls.activelink, previousSalaries),
     fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
     fetchGreenhouseBoardListings("pokemon", "The Pokémon Company International", boardUrls.pokemon),
     fetchDrccListings(boardUrls.drcc),
     fetchRiseListings(boardUrls.rise),
+    fetchAshbyBoardListings("tem", "Tem", boardUrls.tem),
+    fetchFeeldListings(boardUrls.feeld),
+    fetchReapListings(boardUrls.reap),
+    fetchAshbyBoardListings("coder", "Coder", boardUrls.coder),
+    fetchCoreweaveListings("coreweave", "CoreWeave", boardUrls.coreweave),
   ]);
-  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs, ...pokemonJobs, ...drccJobs, ...riseJobs].map((jobEntry) => ({
+  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs, ...pokemonJobs, ...drccJobs, ...riseJobs, ...temJobs, ...feeldJobs, ...reapJobs, ...coderJobs, ...coreweaveJobs].map((jobEntry) => ({
     ...jobEntry,
     hidden: hiddenIds.has(jobEntry.id),
   }));
@@ -833,6 +996,11 @@ async function mainFetch(): Promise<void> {
       { id: "pokemon" as SourceId, label: "Pokemon", boardUrl: boardUrls.pokemon },
       { id: "drcc" as SourceId, label: "DRCC", boardUrl: boardUrls.drcc },
       { id: "rise" as SourceId, label: "RISE Counselling", boardUrl: boardUrls.rise },
+      { id: "tem" as SourceId, label: "Tem", boardUrl: boardUrls.tem },
+      { id: "feeld" as SourceId, label: "Feeld", boardUrl: boardUrls.feeld },
+      { id: "reap" as SourceId, label: "Reap", boardUrl: boardUrls.reap },
+      { id: "coder" as SourceId, label: "Coder", boardUrl: boardUrls.coder },
+      { id: "coreweave" as SourceId, label: "CoreWeave", boardUrl: boardUrls.coreweave },
     ],
     jobs: combinedJobs,
   };

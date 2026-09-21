@@ -106,7 +106,22 @@ function sourceLabel(source: SourceId): string {
   if (source === "drcc") {
     return "DRCC";
   }
-  return "RISE Counselling";
+  if (source === "rise") {
+    return "RISE Counselling";
+  }
+  if (source === "tem") {
+    return "Tem";
+  }
+  if (source === "feeld") {
+    return "Feeld";
+  }
+  if (source === "reap") {
+    return "Reap";
+  }
+  if (source === "coder") {
+    return "Coder";
+  }
+  return "CoreWeave";
 }
 
 function renderSourceChips(): void {
@@ -400,7 +415,7 @@ function bindFilterControls(): void {
     boardState.filters = {
       keyword: "",
       sources: [],
-      locations: [...DEFAULT_LOCATIONS],
+      locations: [],
       workMode: "all",
       hidden: "active",
       salaryMin: null,

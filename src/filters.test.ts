@@ -65,6 +65,12 @@ describe("matchesLocation", () => {
     expect(matchesLocation(makeJob(), ["dublin"])).toBe(true);
     expect(matchesLocation(makeJob(), ["Cork"])).toBe(false);
   });
+
+  test("EMEA matches Europe and EMEA locations", () => {
+    expect(matchesLocation(makeJob({ locationRaw: "Europe" }), ["EMEA"])).toBe(true);
+    expect(matchesLocation(makeJob({ locationRaw: "Dublin, Ireland" }), ["EMEA"])).toBe(false);
+    expect(matchesLocation(makeJob({ locationRaw: "London, EMEA" }), ["EMEA"])).toBe(true);
+  });
 });
 
 describe("isEffectivelyHidden", () => {

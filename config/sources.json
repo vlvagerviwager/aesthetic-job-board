@@ -34,5 +34,35 @@
     "label": "RISE Counselling",
     "boardUrl": "https://risecounselling.ie/vacancies/",
     "notes": "WordPress site with vacancies on a static page. Build script scrapes the vacancies page for current job listings."
+  },
+  {
+    "id": "tem",
+    "label": "Tem",
+    "boardUrl": "https://jobs.ashbyhq.com/tem",
+    "notes": "Ashby-hosted board. Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/tem)."
+  },
+  {
+    "id": "feeld",
+    "label": "Feeld",
+    "boardUrl": "https://feeld.co/careers",
+    "notes": "Static HTML page. Build script scrapes the careers page for current job listings."
+  },
+  {
+    "id": "reap",
+    "label": "Reap",
+    "boardUrl": "https://careers.reap.global/jobs",
+    "notes": "Teamtailor-hosted board. Build script reads the JSON feed (careers.reap.global/jobs.json)."
+  },
+  {
+    "id": "coder",
+    "label": "Coder",
+    "boardUrl": "https://jobs.ashbyhq.com/Coder",
+    "notes": "Ashby-hosted board. Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/Coder)."
+  },
+  {
+    "id": "coreweave",
+    "label": "CoreWeave",
+    "boardUrl": "https://www.coreweave.com/careers/eu",
+    "notes": "Greenhouse-hosted board (coreweaveu). Build script reads the public Greenhouse boards API, filtered to Ireland/EMEA locations only."
   }
 ]

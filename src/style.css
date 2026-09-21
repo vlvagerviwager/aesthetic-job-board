@@ -417,6 +417,11 @@ body {
 .tag-source-pokemon { background: var(--color-yellow); color: var(--color-navy); }
 .tag-source-drcc { background: var(--color-peach); color: var(--color-ink); }
 .tag-source-rise { background: var(--color-lavender); color: var(--color-ink); }
+.tag-source-tem { background: var(--color-blue); color: var(--color-navy); }
+.tag-source-feeld { background: var(--color-pink); color: var(--color-navy); }
+.tag-source-reap { background: var(--color-mint); color: var(--color-ink); }
+.tag-source-coder { background: var(--color-peach); color: var(--color-ink); }
+.tag-source-coreweave { background: var(--color-lavender); color: var(--color-ink); }
 .tag-mode-remote { background: var(--color-mint); color: var(--color-ink); }
 .tag-mode-hybrid { background: var(--color-peach); color: var(--color-ink); }
 .tag-mode-onsite { background: var(--color-lavender); color: var(--color-ink); }
@@ -433,6 +438,11 @@ body {
 [data-theme="dark"] .tag-source-pokemon { background: var(--color-yellow); color: #1e2450; border-color: var(--color-yellow); }
 [data-theme="dark"] .tag-source-drcc { background: var(--color-peach); color: #1e2450; border-color: var(--color-peach); }
 [data-theme="dark"] .tag-source-rise { background: var(--color-lavender); color: #1e2450; border-color: var(--color-lavender); }
+[data-theme="dark"] .tag-source-tem { background: var(--color-blue); color: #1e2450; border-color: var(--color-blue); }
+[data-theme="dark"] .tag-source-feeld { background: var(--color-pink); color: #241f36; border-color: var(--color-pink); }
+[data-theme="dark"] .tag-source-reap { background: var(--color-mint); color: #1e2450; border-color: var(--color-mint); }
+[data-theme="dark"] .tag-source-coder { background: var(--color-peach); color: #1e2450; border-color: var(--color-peach); }
+[data-theme="dark"] .tag-source-coreweave { background: var(--color-lavender); color: #1e2450; border-color: var(--color-lavender); }
 [data-theme="dark"] .tag-mode-hybrid { background: var(--color-peach); }
 [data-theme="dark"] .tag-mode-onsite { background: var(--color-lavender); }
 [data-theme="dark"] .tag-hidden { background: var(--color-red); border-color: var(--color-red); color: #241f36; }

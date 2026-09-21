@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   extractSalaryFromDetail,
+  fetchCoreweaveListings,
+  fetchFeeldListings,
+  fetchReapListings,
   mapAshbyPostingToListing,
   mapGreenhouseJobToListing,
   parseActivelinkDate,
@@ -189,5 +192,89 @@ describe("parseRisePage", () => {
   test("returns empty array when no vacancies found", () => {
     const html = `<html><body><div class="bde-rich-text-396-105"><p>No current vacancies.</p></div></body></html>`;
     expect(parseRisePage(html, "https://risecounselling.ie/vacancies/")).toHaveLength(0);
+  });
+});
+
+describe("fetchReapListings", () => {
+  test("parses Reap JSON feed items", async () => {
+    const mockJson = {
+      items: [
+        {
+          id: "test-123",
+          title: "Billing Analyst",
+          url: "https://careers.reap.global/jobs/8376484-billing-analyst",
+          date_published: "2026-09-14T22:32:34+08:00",
+          content_html: "<p>About Reap</p><p>Salary: €50,000 per annum</p>",
+        },
+      ],
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(new Response(JSON.stringify(mockJson)))) as unknown as typeof fetch;
+    try {
+      const jobs = await fetchReapListings("https://careers.reap.global/jobs");
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]?.title).toBe("Billing Analyst");
+      expect(jobs[0]?.source).toBe("reap");
+      expect(jobs[0]?.salary).toBe("€50,000 per annum");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("fetchFeeldListings", () => {
+  test("parses Feeld career page links and fetches details", async () => {
+    const mockMainPage = `<html><body>
+      <a href="https://feeldco.workable.com/jobs/123">Director of Global Markets</a>
+      <a href="https://feeldco.workable.com/jobs/456">VP of Growth</a>
+    </body></html>`;
+    const mockJobPage = `<html><head>
+      <meta property="og:title" content="Director of Global Markets - Feeld">
+      <meta property="og:description" content="We are looking for a Director">
+    </head></html>`;
+    let fetchCount = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = ((url: string) => {
+      fetchCount += 1;
+      if (fetchCount === 1) {
+        return Promise.resolve(new Response(mockMainPage, { headers: { "content-type": "text/html" } }));
+      }
+      return Promise.resolve(new Response(mockJobPage, { headers: { "content-type": "text/html" } }));
+    }) as unknown as typeof fetch;
+    try {
+      const jobs = await fetchFeeldListings("https://feeld.co/careers");
+      expect(jobs).toHaveLength(2);
+      expect(jobs[0]?.title).toBe("Director of Global Markets");
+      expect(jobs[0]?.source).toBe("feeld");
+      expect(jobs[0]?.url).toBe("https://feeldco.workable.com/jobs/123");
+      expect(jobs[0]?.summary).toBe("We are looking for a Director");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("fetchCoreweaveListings", () => {
+  test("filters jobs to Ireland/EMEA locations only", async () => {
+    const mockJson = {
+      jobs: [
+        { id: 1, title: "Dublin Engineer", absolute_url: "https://example.com/1", location: { name: "Dublin, Ireland" }, updated_at: "2026-09-01", first_published: "2026-09-01" },
+        { id: 2, title: "Europe Role", absolute_url: "https://example.com/2", location: { name: "Europe" }, updated_at: "2026-09-01", first_published: "2026-09-01" },
+        { id: 3, title: "US Role", absolute_url: "https://example.com/3", location: { name: "New York, USA" }, updated_at: "2026-09-01", first_published: "2026-09-01" },
+      ],
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(new Response(JSON.stringify(mockJson)))) as unknown as typeof fetch;
+    try {
+      const jobs = await fetchCoreweaveListings("coreweave", "CoreWeave", "https://www.coreweave.com/careers/eu");
+      expect(jobs).toHaveLength(2);
+      expect(jobs.map((j) => j.title)).toContain("Dublin Engineer");
+      expect(jobs.map((j) => j.title)).toContain("Europe Role");
+      expect(jobs.map((j) => j.title)).not.toContain("US Role");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

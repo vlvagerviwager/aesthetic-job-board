@@ -41,7 +41,11 @@ export function matchesLocation(job: JobListing, selectedLocations: string[]): b
   }
   const locationLower = job.locationRaw.toLowerCase();
   for (const selectedLocation of selectedLocations) {
-    if (locationLower.includes(selectedLocation.toLowerCase())) {
+    if (selectedLocation === "EMEA") {
+      if (locationLower.includes("emea") || locationLower.includes("europe")) {
+        return true;
+      }
+    } else if (locationLower.includes(selectedLocation.toLowerCase())) {
       return true;
     }
   }
