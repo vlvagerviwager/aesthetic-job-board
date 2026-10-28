@@ -3,13 +3,20 @@ import {
   extractSalaryFromDetail,
   fetchCoreweaveListings,
   fetchFeeldListings,
+  fetchPietaListings,
   fetchReapListings,
+  fetchUphealListings,
   mapAshbyPostingToListing,
   mapGreenhouseJobToListing,
   parseActivelinkDate,
+  parseAwarePage,
   parseDrccPage,
+  parsePietaClosingDate,
+  parsePietaDetail,
+  parsePietaPage,
   parsePublicjobsDate,
   parseRisePage,
+  parseUphealPage,
   resolvePublicjobsUrl,
 } from "./fetch-jobs";
 
@@ -276,5 +283,201 @@ describe("fetchCoreweaveListings", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+const UPHEAL_PAGE_HTML = `<html><body><div class="uui-career06_list-wrapper"><aside class="w-dyn-list"><div role="list" class="w-dyn-items">
+  <div class="collection-item w-dyn-item">
+    <div class="uui-career06_item">
+      <div class="uui-career06_title-wrapper">
+        <div class="uui-career06_heading">Head of Product Design</div>
+        <div class="uui-career06_label-wrapper"><div class="uui-badge">Product Design</div></div>
+      </div>
+      <div class="uui-career06_job-details-wrapper">
+        <div class="uui-career06_detail-wrapper"><div class="uui-career06_icon-wrapper"></div><div>Remote - Prague or Europe</div></div>
+        <div class="uui-career06_detail-wrapper"><div class="uui-career06_icon-wrapper"></div><div>Full-time</div></div>
+      </div>
+      <div class="uui-button-row-2"><div class="uui-button-wrapper-2"><a href="/careers/head-of-design">Learn more</a></div></div>
+    </div>
+  </div>
+</div></aside></div></body></html>`;
+
+describe("parseUphealPage", () => {
+  test("maps a Webflow career card with sitemap dates", () => {
+    const postedDates = new Map([
+      ["https://www.upheal.io/careers/head-of-design", "2026-10-21T08:21:21.205Z"],
+    ]);
+    const jobs = parseUphealPage(UPHEAL_PAGE_HTML, "https://www.upheal.io/careers", postedDates);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.id).toBe("upheal-head-of-design");
+    expect(jobs[0]?.source).toBe("upheal");
+    expect(jobs[0]?.url).toBe("https://www.upheal.io/careers/head-of-design");
+    expect(jobs[0]?.locationRaw).toBe("Remote - Prague or Europe");
+    expect(jobs[0]?.summary).toBe("Product Design · Full-time");
+    expect(jobs[0]?.workMode).toBe("remote");
+    expect(jobs[0]?.postedDate).toBe("2026-10-21T08:21:21.205Z");
+  });
+
+  test("returns no jobs when the list is empty", () => {
+    expect(parseUphealPage("<html><body></body></html>", "https://www.upheal.io/careers")).toHaveLength(0);
+  });
+});
+
+describe("fetchUphealListings", () => {
+  test("reads posted dates from the sitemap", async () => {
+    const sitemapXml = `<urlset><url><loc>https://www.upheal.io/careers/head-of-design</loc><lastmod>2026-10-21T08:21:21.205Z</lastmod></url></urlset>`;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = ((url: string) => {
+      if (String(url).includes("sitemap.xml")) {
+        return Promise.resolve(new Response(sitemapXml));
+      }
+      return Promise.resolve(new Response(UPHEAL_PAGE_HTML, { headers: { "content-type": "text/html" } }));
+    }) as unknown as typeof fetch;
+    try {
+      const jobs = await fetchUphealListings("https://www.upheal.io/careers");
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]?.postedDate).toBe("2026-10-21T08:21:21.205Z");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+const PIETA_PAGE_HTML = `<html><body>
+  <div class="block_open_positions__tab" data-tab="all">
+    <div class="careers_previews">
+      <a href="/careers/therapist-helpline-and-service-support-team/" class="career_preview">
+        <h3 class="career_preview__heading">Helpline Therapist – Helpline and Service Support Team</h3>
+        <p class="career_preview__excerpt">We are seeking compassionate and skilled mental health professionals.</p>
+        <div class="career_preview__labels">
+          <span class="label label--accent-color-1">Remote</span>
+          <span class="label label--primary">Counsellors</span>
+        </div>
+      </a>
+    </div>
+  </div>
+  <div class="block_open_positions__tab" data-tab="counsellors">
+    <div class="careers_previews">
+      <a href="/careers/therapist-helpline-and-service-support-team/" class="career_preview">
+        <h3 class="career_preview__heading">Helpline Therapist – Helpline and Service Support Team</h3>
+      </a>
+    </div>
+  </div>
+</body></html>`;
+
+const PIETA_DETAIL_HTML = `<html><body><div class="block_careers_detail">
+  <div class="career_overview__info_row">
+    <span class="career_overview__info_label">Location:</span>
+    <span class="career_overview__info_value">Remote</span>
+  </div>
+  <div class="career_overview__info_row">
+    <span class="career_overview__info_label">Position Type:</span>
+    <span class="career_overview__info_value">24 hours per week</span>
+  </div>
+  <div class="career_overview__info_row">
+    <span class="career_overview__info_label">Salary:</span>
+    <span class="career_overview__info_value">€23.76 per hour</span>
+  </div>
+  <p><strong>Closing Date: 11th of November 2026</strong></p>
+</div></body></html>`;
+
+describe("parsePietaPage", () => {
+  test("maps a career preview once even when category tabs repeat it", () => {
+    const jobs = parsePietaPage(PIETA_PAGE_HTML, "https://www.pieta.ie/careers/");
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.id).toBe("pieta-therapist-helpline-and-service-support-team");
+    expect(jobs[0]?.source).toBe("pieta");
+    expect(jobs[0]?.url).toBe("https://www.pieta.ie/careers/therapist-helpline-and-service-support-team/");
+    expect(jobs[0]?.locationRaw).toBe("Remote");
+    expect(jobs[0]?.workMode).toBe("remote");
+  });
+});
+
+describe("parsePietaDetail", () => {
+  test("reads location, position type, salary and closing date", () => {
+    const detail = parsePietaDetail(PIETA_DETAIL_HTML);
+    expect(detail.locationRaw).toBe("Remote");
+    expect(detail.positionType).toBe("24 hours per week");
+    expect(detail.salary).toBe("€23.76 per hour");
+    expect(detail.closingDate).toBe("2026-11-11T09:00:00.000Z");
+  });
+
+  test("returns empty values when detail fields are missing", () => {
+    const detail = parsePietaDetail("<html><body><p>No details</p></body></html>");
+    expect(detail.locationRaw).toBe("");
+    expect(detail.salary).toBe("");
+    expect(detail.closingDate).toBe("");
+  });
+});
+
+describe("parsePietaClosingDate", () => {
+  test("parses ordinal closing dates with an 'of'", () => {
+    expect(parsePietaClosingDate("Closing Date: 11th of November 2026")).toBe("2026-11-11T09:00:00.000Z");
+  });
+
+  test("parses closing dates preceded by a time", () => {
+    expect(parsePietaClosingDate("Closing Date: 5pm, 11th November 2026")).toBe("2026-11-11T09:00:00.000Z");
+  });
+
+  test("returns an empty string when no closing date is present", () => {
+    expect(parsePietaClosingDate("Applications close soon")).toBe("");
+  });
+});
+
+describe("fetchPietaListings", () => {
+  test("enriches listings with detail page salary and closing date", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = ((url: string) => {
+      if (String(url) === "https://www.pieta.ie/careers/") {
+        return Promise.resolve(new Response(PIETA_PAGE_HTML, { headers: { "content-type": "text/html" } }));
+      }
+      return Promise.resolve(new Response(PIETA_DETAIL_HTML, { headers: { "content-type": "text/html" } }));
+    }) as unknown as typeof fetch;
+    const previousPostedDates = new Map([
+      ["pieta-therapist-helpline-and-service-support-team", "2026-10-01T09:00:00.000Z"],
+    ]);
+    try {
+      const jobs = await fetchPietaListings("https://www.pieta.ie/careers/", previousPostedDates);
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]?.salary).toBe("€23.76 per hour");
+      expect(jobs[0]?.closingDate).toBe("2026-11-11T09:00:00.000Z");
+      expect(jobs[0]?.postedDate).toBe("2026-10-01T09:00:00.000Z");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+const AWARE_PAGE_HTML = `<html><head>
+  <meta property="article:modified_time" content="2026-10-22T08:48:52+00:00" />
+</head><body>
+  <a class="elementor-cta" href="#SOLACE">
+    <h3 class="elementor-cta__title">The Aware Counselling Service</h3>
+  </a>
+  <a class="elementor-cta" href="#TP">
+    <h3 class="elementor-cta__title">Training Partner (TP)</h3>
+    <div class="elementor-cta__description">Resilience Programme for Adults &amp; Life Skills for Schools Programmes</div>
+  </a>
+  <a class="elementor-cta" href="#MHP">
+    <h3 class="elementor-cta__title">Mental Health Professional (MHP)</h3>
+    <div class="elementor-cta__description">Family Support Programme &amp; Living Well With Bipolar Disorder Programme</div>
+  </a>
+</body></html>`;
+
+describe("parseAwarePage", () => {
+  test("maps the three expression-of-interest role cards", () => {
+    const jobs = parseAwarePage(AWARE_PAGE_HTML, "https://www.aware.ie/get-involved/workwithus/");
+    expect(jobs).toHaveLength(3);
+    expect(jobs[0]?.id).toBe("aware-the-aware-counselling-service");
+    expect(jobs[0]?.url).toBe("https://www.aware.ie/get-involved/workwithus/#SOLACE");
+    expect(jobs[0]?.locationRaw).toBe("Dublin 4 or remote");
+    expect(jobs[0]?.workMode).toBe("remote");
+    expect(jobs[0]?.postedDate).toBe("2026-10-22T08:48:52.000Z");
+    expect(jobs[1]?.locationRaw).toBe("Nationwide");
+    expect(jobs[1]?.summary).toBe("Resilience Programme for Adults & Life Skills for Schools Programmes");
+  });
+
+  test("returns no jobs when the page has no role cards", () => {
+    expect(parseAwarePage("<html><body></body></html>", "https://www.aware.ie/get-involved/workwithus/")).toHaveLength(0);
   });
 });

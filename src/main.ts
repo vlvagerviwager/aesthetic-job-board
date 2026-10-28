@@ -121,7 +121,16 @@ function sourceLabel(source: SourceId): string {
   if (source === "coder") {
     return "Coder";
   }
-  return "CoreWeave";
+  if (source === "coreweave") {
+    return "CoreWeave";
+  }
+  if (source === "upheal") {
+    return "Upheal";
+  }
+  if (source === "aware") {
+    return "Aware";
+  }
+  return "Pieta";
 }
 
 function renderSourceChips(): void {

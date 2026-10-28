@@ -422,6 +422,9 @@ body {
 .tag-source-reap { background: var(--color-mint); color: var(--color-ink); }
 .tag-source-coder { background: var(--color-peach); color: var(--color-ink); }
 .tag-source-coreweave { background: var(--color-lavender); color: var(--color-ink); }
+.tag-source-upheal { background: var(--color-mint); color: var(--color-ink); }
+.tag-source-aware { background: var(--color-yellow); color: var(--color-ink); }
+.tag-source-pieta { background: var(--color-peach); color: var(--color-ink); }
 .tag-mode-remote { background: var(--color-mint); color: var(--color-ink); }
 .tag-mode-hybrid { background: var(--color-peach); color: var(--color-ink); }
 .tag-mode-onsite { background: var(--color-lavender); color: var(--color-ink); }
@@ -443,6 +446,9 @@ body {
 [data-theme="dark"] .tag-source-reap { background: var(--color-mint); color: #1e2450; border-color: var(--color-mint); }
 [data-theme="dark"] .tag-source-coder { background: var(--color-peach); color: #1e2450; border-color: var(--color-peach); }
 [data-theme="dark"] .tag-source-coreweave { background: var(--color-lavender); color: #1e2450; border-color: var(--color-lavender); }
+[data-theme="dark"] .tag-source-upheal { background: var(--color-mint); color: #1e2450; border-color: var(--color-mint); }
+[data-theme="dark"] .tag-source-aware { background: var(--color-yellow); color: #1e2450; border-color: var(--color-yellow); }
+[data-theme="dark"] .tag-source-pieta { background: var(--color-peach); color: #1e2450; border-color: var(--color-peach); }
 [data-theme="dark"] .tag-mode-hybrid { background: var(--color-peach); }
 [data-theme="dark"] .tag-mode-onsite { background: var(--color-lavender); }
 [data-theme="dark"] .tag-hidden { background: var(--color-red); border-color: var(--color-red); color: #241f36; }

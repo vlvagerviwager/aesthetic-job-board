@@ -64,5 +64,23 @@
     "label": "CoreWeave",
     "boardUrl": "https://www.coreweave.com/careers/eu",
     "notes": "Greenhouse-hosted board (coreweaveu). Build script reads the public Greenhouse boards API, filtered to Ireland/EMEA locations only."
+  },
+  {
+    "id": "upheal",
+    "label": "Upheal",
+    "boardUrl": "https://www.upheal.io/careers",
+    "notes": "Webflow careers page. Build script scrapes the role list and reads per-role lastmod dates from the Webflow sitemap."
+  },
+  {
+    "id": "aware",
+    "label": "Aware",
+    "boardUrl": "https://www.aware.ie/get-involved/workwithus/",
+    "notes": "WordPress page with three standing expression-of-interest role cards. Build script scrapes the cards and uses the page article:modified_time as the posted date."
+  },
+  {
+    "id": "pieta",
+    "label": "Pieta",
+    "boardUrl": "https://www.pieta.ie/careers/#positions",
+    "notes": "Storyblok-rendered careers page. Build script scrapes current opportunities and reads location, salary and closing date from each detail page."
   }
 ]

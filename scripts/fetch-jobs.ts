@@ -22,9 +22,12 @@ const FALLBACK_FEELD_BOARD_URL = "https://feeld.co/careers";
 const FALLBACK_REAP_BOARD_URL = "https://careers.reap.global/jobs";
 const FALLBACK_CODER_BOARD_URL = "https://jobs.ashbyhq.com/Coder";
 const FALLBACK_COREWEAVE_BOARD_URL = "https://www.coreweave.com/careers/eu";
+const FALLBACK_UPHEAL_BOARD_URL = "https://www.upheal.io/careers";
+const FALLBACK_AWARE_BOARD_URL = "https://www.aware.ie/get-involved/workwithus/";
+const FALLBACK_PIETA_BOARD_URL = "https://www.pieta.ie/careers/#positions";
 const ACTIVELINK_ORIGIN = "https://www.activelink.ie";
 
-type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise" | "tem" | "feeld" | "reap" | "coder" | "coreweave", string>;
+type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise" | "tem" | "feeld" | "reap" | "coder" | "coreweave" | "upheal" | "aware" | "pieta", string>;
 
 async function readBoardUrls(): Promise<BoardUrlSet> {
   const fallbackUrls: BoardUrlSet = {
@@ -39,6 +42,9 @@ async function readBoardUrls(): Promise<BoardUrlSet> {
     reap: FALLBACK_REAP_BOARD_URL,
     coder: FALLBACK_CODER_BOARD_URL,
     coreweave: FALLBACK_COREWEAVE_BOARD_URL,
+    upheal: FALLBACK_UPHEAL_BOARD_URL,
+    aware: FALLBACK_AWARE_BOARD_URL,
+    pieta: FALLBACK_PIETA_BOARD_URL,
   };
   try {
     const configFile = Bun.file(SOURCES_CONFIG_PATH);
@@ -62,7 +68,10 @@ async function readBoardUrls(): Promise<BoardUrlSet> {
         sourceEntry.id === "feeld" ||
         sourceEntry.id === "reap" ||
         sourceEntry.id === "coder" ||
-        sourceEntry.id === "coreweave"
+        sourceEntry.id === "coreweave" ||
+        sourceEntry.id === "upheal" ||
+        sourceEntry.id === "aware" ||
+        sourceEntry.id === "pieta"
       ) {
         if (typeof sourceEntry.boardUrl === "string" && sourceEntry.boardUrl !== "") {
           resolvedUrls[sourceEntry.id] = sourceEntry.boardUrl;
@@ -254,20 +263,20 @@ export function extractSalaryFromDetail(detailHtml: string): string {
   return "";
 }
 
-async function readPreviousSalaries(): Promise<Map<string, string>> {
+async function readPreviousPayloadJobs(): Promise<JobListing[]> {
   try {
     const payloadFile = Bun.file(OUTPUT_PAYLOAD_PATH);
     if ((await payloadFile.exists()) === false) {
-      return new Map<string, string>();
+      return [];
     }
     const previousPayload = (await payloadFile.json()) as JobsPayload;
     if (Array.isArray(previousPayload.jobs) === false) {
-      return new Map<string, string>();
+      return [];
     }
-    return new Map(previousPayload.jobs.map((jobEntry) => [jobEntry.id, jobEntry.salary ?? ""]));
+    return previousPayload.jobs;
   } catch (error) {
-    console.warn("Could not read previous jobs payload for salary cache, refetching all.", error);
-    return new Map<string, string>();
+    console.warn("Could not read previous jobs payload, refetching all.", error);
+    return [];
   }
 }
 
@@ -939,6 +948,282 @@ export async function fetchCoreweaveListings(
   return collectedJobs;
 }
 
+const UPHEAL_SITEMAP_URL = "https://www.upheal.io/sitemap.xml";
+
+function normalizeUrlForLookup(rawUrl: string): string {
+  return rawUrl.trim().replace(/\/+$/, "");
+}
+
+async function fetchSitemapLastModified(sitemapUrl: string): Promise<Map<string, string>> {
+  const lastModifiedByUrl = new Map<string, string>();
+  try {
+    const sitemapXml = await fetchHtmlWithTimeout(sitemapUrl);
+    const sitemapRoot = cheerio.load(sitemapXml, { xmlMode: true });
+    sitemapRoot("url").each((_index, urlElement) => {
+      const urlSelection = sitemapRoot(urlElement);
+      const pageUrl = urlSelection.find("loc").first().text().trim();
+      const lastModified = urlSelection.find("lastmod").first().text().trim();
+      if (pageUrl !== "" && lastModified !== "") {
+        lastModifiedByUrl.set(normalizeUrlForLookup(pageUrl), lastModified);
+      }
+    });
+  } catch (error) {
+    console.warn(`Could not read sitemap ${sitemapUrl}, using fetch time for posted dates.`, error);
+  }
+  return lastModifiedByUrl;
+}
+
+export function parseUphealPage(
+  html: string,
+  boardUrl: string,
+  postedDates: Map<string, string> = new Map<string, string>(),
+): JobListing[] {
+  const root = cheerio.load(html);
+  const jobs: JobListing[] = [];
+  const seenUrls = new Set<string>();
+  root(".uui-career06_list-wrapper .collection-item").each((_index, element) => {
+    const card = root(element);
+    const title = card.find(".uui-career06_heading").first().text().replace(/\s+/g, " ").trim();
+    const href = card.find(".uui-button-wrapper-2 a").first().attr("href") ?? "";
+    if (title === "" || href === "") {
+      return;
+    }
+    const jobUrl = resolveBoardUrl(href, boardUrl);
+    if (seenUrls.has(jobUrl)) {
+      return;
+    }
+    seenUrls.add(jobUrl);
+    const department = card.find(".uui-badge").first().text().replace(/\s+/g, " ").trim();
+    const detailTexts: string[] = [];
+    card.find(".uui-career06_detail-wrapper").each((_detailIndex, detailElement) => {
+      const detailText = root(detailElement).text().replace(/\s+/g, " ").trim();
+      if (detailText !== "") {
+        detailTexts.push(detailText);
+      }
+    });
+    const locationRaw = detailTexts[0] ?? "Remote";
+    const employmentType = detailTexts[1] ?? "";
+    const summaryParts = [department, employmentType].filter((part) => part !== "");
+    const summary = summaryParts.length > 0 ? summaryParts.join(" · ") : "Upheal";
+    const slug = normalizeUrlForLookup(jobUrl).split("/").pop() ?? title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const postedDate = parseAshbyDate(postedDates.get(normalizeUrlForLookup(jobUrl)) ?? "");
+    jobs.push({
+      id: `upheal-${slug}`,
+      source: "upheal",
+      title,
+      url: jobUrl,
+      organisation: "Upheal",
+      locationRaw,
+      summary,
+      postedDate,
+      closingDate: "",
+      workMode: detectWorkMode(locationRaw, title, summary),
+      hidden: false,
+      salary: "",
+    });
+  });
+  return jobs;
+}
+
+export async function fetchUphealListings(boardUrl: string): Promise<JobListing[]> {
+  console.log(`Fetching Upheal careers from ${boardUrl}`);
+  const [html, postedDates] = await Promise.all([
+    fetchHtmlWithTimeout(boardUrl),
+    fetchSitemapLastModified(UPHEAL_SITEMAP_URL),
+  ]);
+  const jobs = parseUphealPage(html, boardUrl, postedDates);
+  if (jobs.length === 0) {
+    console.log("Upheal page returned no parseable vacancies — site may have changed or no current openings.");
+  }
+  return jobs;
+}
+
+export interface PietaJobDetail {
+  locationRaw: string;
+  positionType: string;
+  salary: string;
+  closingDate: string;
+}
+
+export function parsePietaClosingDate(rawText: string): string {
+  const closingMatch = rawText.match(/Closing Date:\s*([^<]{0,80})/i);
+  const dateMatch = closingMatch?.[1]?.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-z]+)\s*,?\s*(\d{4})/i);
+  if (dateMatch === null || dateMatch === undefined) {
+    return "";
+  }
+  return parsePublicjobsDate(`${dateMatch[1] ?? ""} ${dateMatch[2] ?? ""} ${dateMatch[3] ?? ""}`);
+}
+
+export function parsePietaDetail(html: string): PietaJobDetail {
+  const root = cheerio.load(html);
+  const infoByLabel = new Map<string, string>();
+  root(".career_overview__info_row").each((_index, rowElement) => {
+    const row = root(rowElement);
+    const label = row
+      .find(".career_overview__info_label")
+      .first()
+      .text()
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/:$/, "")
+      .toLowerCase();
+    const value = row.find(".career_overview__info_value").first().text().replace(/\s+/g, " ").trim();
+    if (label !== "" && value !== "") {
+      infoByLabel.set(label, value);
+    }
+  });
+  const closingDate = parsePietaClosingDate(root(".block_careers_detail").text().replace(/\s+/g, " "));
+  return {
+    locationRaw: infoByLabel.get("location") ?? "",
+    positionType: infoByLabel.get("position type") ?? "",
+    salary: infoByLabel.get("salary") ?? "",
+    closingDate,
+  };
+}
+
+export function parsePietaPage(html: string, boardUrl: string): JobListing[] {
+  const root = cheerio.load(html);
+  const jobs: JobListing[] = [];
+  const seenIds = new Set<string>();
+  root(".block_open_positions__tab[data-tab='all'] .career_preview").each((_index, element) => {
+    const card = root(element);
+    const title = card.find(".career_preview__heading").first().text().replace(/\s+/g, " ").trim();
+    const href = card.attr("href") ?? "";
+    if (title === "" || href === "") {
+      return;
+    }
+    const jobUrl = resolveBoardUrl(href, boardUrl);
+    const slug = normalizeUrlForLookup(jobUrl).split("/").pop() ?? title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    if (seenIds.has(slug)) {
+      return;
+    }
+    seenIds.add(slug);
+    const excerpt = card.find(".career_preview__excerpt").first().text().replace(/\s+/g, " ").trim();
+    const labels: string[] = [];
+    card.find(".career_preview__labels .label").each((_labelIndex, labelElement) => {
+      const labelText = root(labelElement).text().replace(/\s+/g, " ").trim();
+      if (labelText !== "") {
+        labels.push(labelText);
+      }
+    });
+    const locationRaw = labels[0] ?? "Ireland";
+    const category = labels[1] ?? "";
+    const summary = excerpt !== "" ? excerpt : category === "" ? "Pieta" : category;
+    jobs.push({
+      id: `pieta-${slug}`,
+      source: "pieta",
+      title,
+      url: jobUrl,
+      organisation: "Pieta",
+      locationRaw,
+      summary,
+      postedDate: new Date().toISOString(),
+      closingDate: "",
+      workMode: detectWorkMode(locationRaw, title, summary),
+      hidden: false,
+      salary: "",
+    });
+  });
+  return jobs;
+}
+
+export async function fetchPietaListings(
+  boardUrl: string,
+  previousPostedDates: Map<string, string> = new Map<string, string>(),
+): Promise<JobListing[]> {
+  console.log(`Fetching Pieta careers from ${boardUrl}`);
+  const html = await fetchHtmlWithTimeout(boardUrl);
+  const jobs = parsePietaPage(html, boardUrl);
+  for (const job of jobs) {
+    job.postedDate = previousPostedDates.get(job.id) ?? job.postedDate;
+    try {
+      const detailHtml = await fetchHtmlWithTimeout(job.url);
+      const detail = parsePietaDetail(detailHtml);
+      if (detail.locationRaw !== "") {
+        job.locationRaw = detail.locationRaw;
+      }
+      if (detail.salary !== "") {
+        job.salary = detail.salary;
+      }
+      if (detail.closingDate !== "") {
+        job.closingDate = detail.closingDate;
+      }
+      if (job.summary === "Pieta" && detail.positionType !== "") {
+        job.summary = detail.positionType;
+      }
+      job.workMode = detectWorkMode(job.locationRaw, job.title, job.summary);
+    } catch (error) {
+      console.warn(`Could not fetch Pieta details for ${job.id}, leaving salary empty.`, error);
+    }
+    await sleepMilliseconds(DELAY_BETWEEN_PAGES_MS);
+  }
+  if (jobs.length === 0) {
+    console.log("Pieta page returned no parseable vacancies — site may have changed or no current openings.");
+  }
+  return jobs;
+}
+
+const AWARE_ROLE_LOCATIONS: Record<string, string> = {
+  "#SOLACE": "Dublin 4 or remote",
+  "#TP": "Nationwide",
+  "#MHP": "Nationwide",
+};
+
+export function parseAwareModifiedDate(html: string): string {
+  const modifiedMatch =
+    html.match(/<meta[^>]*property=["']article:modified_time["'][^>]*content=["']([^"']+)["']/i) ??
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']article:modified_time["']/i);
+  return parseAshbyDate(modifiedMatch?.[1] ?? "");
+}
+
+export function parseAwarePage(html: string, boardUrl: string): JobListing[] {
+  const root = cheerio.load(html);
+  const postedDate = parseAwareModifiedDate(html);
+  const jobs: JobListing[] = [];
+  root("a.elementor-cta").each((_index, element) => {
+    const card = root(element);
+    const href = card.attr("href") ?? "";
+    const title = card.find(".elementor-cta__title").first().text().replace(/\s+/g, " ").trim();
+    if (href === "" || title === "") {
+      return;
+    }
+    const descriptionHtml = card.find(".elementor-cta__description").first().html() ?? "";
+    const description = cheerio
+      .load(`<div>${descriptionHtml.replace(/<br\s*\/?>/gi, " ")}</div>`)("div")
+      .first()
+      .text()
+      .replace(/\s+/g, " ")
+      .trim();
+    const locationRaw = AWARE_ROLE_LOCATIONS[href] ?? "Nationwide";
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    jobs.push({
+      id: `aware-${slug}`,
+      source: "aware",
+      title,
+      url: resolveBoardUrl(href, boardUrl),
+      organisation: "Aware",
+      locationRaw,
+      summary: description === "" ? "Counselling Service" : description,
+      postedDate,
+      closingDate: "",
+      workMode: detectWorkMode(locationRaw, title, description),
+      hidden: false,
+      salary: "",
+    });
+  });
+  return jobs;
+}
+
+export async function fetchAwareListings(boardUrl: string): Promise<JobListing[]> {
+  console.log(`Fetching Aware work-with-us page from ${boardUrl}`);
+  const html = await fetchHtmlWithTimeout(boardUrl);
+  const jobs = parseAwarePage(html, boardUrl);
+  if (jobs.length === 0) {
+    console.log("Aware page returned no parseable roles — site may have changed.");
+  }
+  return jobs;
+}
+
 async function readHiddenIds(): Promise<Set<string>> {
   try {
     const hiddenFile = Bun.file(HIDDEN_CONFIG_PATH);
@@ -962,9 +1247,11 @@ const MIN_EXPECTED_JOBS = 80;
 
 async function mainFetch(): Promise<void> {
   const boardUrls = await readBoardUrls();
-  const previousSalaries = await readPreviousSalaries();
+  const previousJobs = await readPreviousPayloadJobs();
+  const previousSalaries = new Map(previousJobs.map((jobEntry) => [jobEntry.id, jobEntry.salary ?? ""]));
+  const previousPostedDates = new Map(previousJobs.map((jobEntry) => [jobEntry.id, jobEntry.postedDate]));
   const hiddenIds = await readHiddenIds();
-  const [publicjobsJobs, activelinkJobs, roompricegenieJobs, pokemonJobs, drccJobs, riseJobs, temJobs, feeldJobs, reapJobs, coderJobs, coreweaveJobs] = await Promise.all([
+  const [publicjobsJobs, activelinkJobs, roompricegenieJobs, pokemonJobs, drccJobs, riseJobs, temJobs, feeldJobs, reapJobs, coderJobs, coreweaveJobs, uphealJobs, awareJobs, pietaJobs] = await Promise.all([
     fetchPublicjobsListings(boardUrls.publicjobs),
     fetchActivelinkListings(boardUrls.activelink, previousSalaries),
     fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
@@ -976,8 +1263,11 @@ async function mainFetch(): Promise<void> {
     fetchReapListings(boardUrls.reap),
     fetchAshbyBoardListings("coder", "Coder", boardUrls.coder),
     fetchCoreweaveListings("coreweave", "CoreWeave", boardUrls.coreweave),
+    fetchUphealListings(boardUrls.upheal),
+    fetchAwareListings(boardUrls.aware),
+    fetchPietaListings(boardUrls.pieta, previousPostedDates),
   ]);
-  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs, ...pokemonJobs, ...drccJobs, ...riseJobs, ...temJobs, ...feeldJobs, ...reapJobs, ...coderJobs, ...coreweaveJobs].map((jobEntry) => ({
+  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs, ...pokemonJobs, ...drccJobs, ...riseJobs, ...temJobs, ...feeldJobs, ...reapJobs, ...coderJobs, ...coreweaveJobs, ...uphealJobs, ...awareJobs, ...pietaJobs].map((jobEntry) => ({
     ...jobEntry,
     hidden: hiddenIds.has(jobEntry.id),
   }));
@@ -1001,6 +1291,9 @@ async function mainFetch(): Promise<void> {
       { id: "reap" as SourceId, label: "Reap", boardUrl: boardUrls.reap },
       { id: "coder" as SourceId, label: "Coder", boardUrl: boardUrls.coder },
       { id: "coreweave" as SourceId, label: "CoreWeave", boardUrl: boardUrls.coreweave },
+      { id: "upheal" as SourceId, label: "Upheal", boardUrl: boardUrls.upheal },
+      { id: "aware" as SourceId, label: "Aware", boardUrl: boardUrls.aware },
+      { id: "pieta" as SourceId, label: "Pieta", boardUrl: boardUrls.pieta },
     ],
     jobs: combinedJobs,
   };
