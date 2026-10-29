@@ -1,5 +1,5 @@
-const HIDDEN_CONFIG_PATH = "config/hidden.json";
-const JOBS_PAYLOAD_PATH = "public/data/jobs.json";
+import { HIDDEN_CONFIG_PATH, JOBS_PAYLOAD_PATH, readJsonFile } from "./paths";
+
 const ID_FLAG_LONG = "--id";
 const UNHIDE_FLAG = "--unhide";
 const LIST_FLAG = "--list";
@@ -35,13 +35,9 @@ export function parseArgs(rawArgs: string[]): ToggleArgs {
 }
 
 async function readHiddenList(): Promise<string[]> {
-  const hiddenFile = Bun.file(HIDDEN_CONFIG_PATH);
-  const hiddenExists = await hiddenFile.exists();
-  if (hiddenExists === false) {
-    return [];
-  }
-  const parsedList = (await hiddenFile.json()) as string[];
-  return Array.isArray(parsedList) ? parsedList : [];
+  return readJsonFile<string[]>(HIDDEN_CONFIG_PATH, [], (parsedList) =>
+    Array.isArray(parsedList) ? parsedList : [],
+  );
 }
 
 export function isUnknownId(knownIds: Set<string> | null, targetId: string): boolean {
@@ -50,21 +46,19 @@ export function isUnknownId(knownIds: Set<string> | null, targetId: string): boo
 
 async function readKnownIds(): Promise<Set<string> | null> {
   try {
-    const payloadFile = Bun.file(JOBS_PAYLOAD_PATH);
-    if ((await payloadFile.exists()) === false) {
-      return null;
-    }
-    const payload = (await payloadFile.json()) as { jobs?: Array<{ id?: string }> };
-    if (Array.isArray(payload.jobs) === false) {
-      return null;
-    }
-    const knownIds = new Set<string>();
-    for (const jobEntry of payload.jobs ?? []) {
-      if (typeof jobEntry.id === "string" && jobEntry.id !== "") {
-        knownIds.add(jobEntry.id);
+    return await readJsonFile<Set<string> | null>(JOBS_PAYLOAD_PATH, null, (parsedPayload) => {
+      const payload = parsedPayload as { jobs?: unknown };
+      if (Array.isArray(payload.jobs) === false) {
+        return null;
       }
-    }
-    return knownIds;
+      const knownIds = new Set<string>();
+      for (const jobEntry of payload.jobs as Array<{ id?: unknown }>) {
+        if (typeof jobEntry.id === "string" && jobEntry.id !== "") {
+          knownIds.add(jobEntry.id);
+        }
+      }
+      return knownIds;
+    });
   } catch {
     return null;
   }

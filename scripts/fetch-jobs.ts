@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import { asSafeHttpUrl, resolveBoardUrl } from "../src/urls";
 import { detectWorkMode } from "../src/workMode";
 import type { JobListing, JobsPayload, SourceId, WorkMode } from "../src/types";
+import { HIDDEN_CONFIG_PATH, JOBS_PAYLOAD_PATH, SOURCES_CONFIG_PATH, readJsonFile } from "./paths";
 
 interface SourceConfig {
   id: SourceId;
@@ -9,7 +10,6 @@ interface SourceConfig {
   boardUrl: string;
 }
 
-const SOURCES_CONFIG_PATH = "config/sources.json";
 const ACTIVELINK_ORIGIN = "https://www.activelink.ie";
 
 export const DEFAULT_BOARD_URLS: Record<SourceId, string> = {
@@ -34,12 +34,10 @@ type BoardUrlSet = Record<SourceId, string>;
 
 async function readBoardUrls(): Promise<BoardUrlSet> {
   try {
-    const configFile = Bun.file(SOURCES_CONFIG_PATH);
-    if ((await configFile.exists()) === false) {
-      return { ...DEFAULT_BOARD_URLS };
-    }
-    const configuredSources = (await configFile.json()) as SourceConfig[];
-    if (Array.isArray(configuredSources) === false) {
+    const configuredSources = await readJsonFile<SourceConfig[] | null>(SOURCES_CONFIG_PATH, null, (parsedValue) =>
+      Array.isArray(parsedValue) ? (parsedValue as SourceConfig[]) : null,
+    );
+    if (configuredSources === null) {
       return { ...DEFAULT_BOARD_URLS };
     }
     const resolvedUrls: BoardUrlSet = { ...DEFAULT_BOARD_URLS };
@@ -77,9 +75,6 @@ function collectJobsCapped<T>(items: Iterable<T>, mapItem: (item: T) => JobListi
   }
   return collectedJobs;
 }
-
-const HIDDEN_CONFIG_PATH = "config/hidden.json";
-const OUTPUT_PAYLOAD_PATH = "public/data/jobs.json";
 
 const EXCLUDED_ACTIVELINK_SECTIONS: string[] = ["tenders", "voluntary", "volunteering"];
 const EXCLUDED_ACTIVELINK_CATEGORY_PATTERN = /\b(tenders?|voluntary|volunteering)\b/i;
@@ -299,15 +294,11 @@ export function extractSalaryFromDetail(detailHtml: string): string {
 
 async function readPreviousPayloadJobs(): Promise<JobListing[]> {
   try {
-    const payloadFile = Bun.file(OUTPUT_PAYLOAD_PATH);
-    if ((await payloadFile.exists()) === false) {
-      return [];
-    }
-    const previousPayload = (await payloadFile.json()) as JobsPayload;
-    if (Array.isArray(previousPayload.jobs) === false) {
-      return [];
-    }
-    return previousPayload.jobs;
+    const previousJobs = await readJsonFile<JobListing[] | null>(JOBS_PAYLOAD_PATH, null, (parsedValue) => {
+      const previousPayload = parsedValue as JobsPayload;
+      return Array.isArray(previousPayload.jobs) ? previousPayload.jobs : null;
+    });
+    return previousJobs ?? [];
   } catch (error) {
     console.warn("Could not read previous jobs payload, refetching all.", error);
     return [];
@@ -1186,17 +1177,12 @@ export async function fetchAwareListings(boardUrl: string): Promise<JobListing[]
 
 async function readHiddenIds(): Promise<Set<string>> {
   try {
-    const hiddenFile = Bun.file(HIDDEN_CONFIG_PATH);
-    const hiddenExists = await hiddenFile.exists();
-    if (hiddenExists === false) {
-      return new Set<string>();
-    }
-    const hiddenList = (await hiddenFile.json()) as string[];
+    const hiddenList = await readJsonFile<unknown>(HIDDEN_CONFIG_PATH, [], (parsedValue) => parsedValue);
     if (Array.isArray(hiddenList) === false) {
       console.warn("Hidden config is not a list, continuing with none hidden.");
       return new Set<string>();
     }
-    return new Set(hiddenList);
+    return new Set(hiddenList as string[]);
   } catch (error) {
     console.warn("Could not read hidden config, continuing with none hidden.", error);
     return new Set<string>();
@@ -1266,7 +1252,7 @@ async function mainFetch(): Promise<void> {
   }));
   if (combinedJobs.length < MIN_EXPECTED_JOBS) {
     throw new Error(
-      `Only ${combinedJobs.length} jobs fetched, expected at least ${MIN_EXPECTED_JOBS}. Refusing to overwrite ${OUTPUT_PAYLOAD_PATH} with a near-empty payload.`,
+      `Only ${combinedJobs.length} jobs fetched, expected at least ${MIN_EXPECTED_JOBS}. Refusing to overwrite ${JOBS_PAYLOAD_PATH} with a near-empty payload.`,
     );
   }
   combinedJobs.sort((firstJob, secondJob) => Date.parse(secondJob.postedDate) - Date.parse(firstJob.postedDate));
@@ -1279,8 +1265,8 @@ async function mainFetch(): Promise<void> {
     })),
     jobs: combinedJobs,
   };
-  await Bun.write(OUTPUT_PAYLOAD_PATH, JSON.stringify(payload, null, 2));
-  console.log(`Wrote ${combinedJobs.length} jobs to ${OUTPUT_PAYLOAD_PATH}`);
+  await Bun.write(JOBS_PAYLOAD_PATH, JSON.stringify(payload, null, 2));
+  console.log(`Wrote ${combinedJobs.length} jobs to ${JOBS_PAYLOAD_PATH}`);
 }
 
 if (import.meta.main) {
