@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { asSafeHttpUrl, resolveBoardUrl } from "../src/urls";
 import { detectWorkMode } from "../src/workMode";
-import type { JobListing, JobsPayload, SourceId } from "../src/types";
+import type { JobListing, JobsPayload, SourceId, WorkMode } from "../src/types";
 
 interface SourceConfig {
   id: SourceId;
@@ -10,78 +10,48 @@ interface SourceConfig {
 }
 
 const SOURCES_CONFIG_PATH = "config/sources.json";
-const FALLBACK_PUBLICJOBS_BOARD_URL =
-  "https://publicjobs.tal.net/vx/lang-en-GB/mobile-0/appcentre-ext/brand-4/xf-7ecb593daca6/candidate/jobboard/vacancy/3/adv/";
-const FALLBACK_ACTIVELINK_BOARD_URL = "https://www.activelink.ie/vacancies";
-const FALLBACK_ROOMPRICEGENIE_BOARD_URL = "https://roompricegenie.com/careers/#jobs";
-const FALLBACK_POKEMON_BOARD_URL = "https://job-boards.greenhouse.io/pokemoncareers";
-const FALLBACK_DRCC_BOARD_URL = "https://www.drcc.ie/about/vacancies/";
-const FALLBACK_RISE_BOARD_URL = "https://risecounselling.ie/vacancies/";
-const FALLBACK_TEM_BOARD_URL = "https://jobs.ashbyhq.com/tem";
-const FALLBACK_FEELD_BOARD_URL = "https://feeld.co/careers";
-const FALLBACK_REAP_BOARD_URL = "https://careers.reap.global/jobs";
-const FALLBACK_CODER_BOARD_URL = "https://jobs.ashbyhq.com/Coder";
-const FALLBACK_COREWEAVE_BOARD_URL = "https://www.coreweave.com/careers/eu";
-const FALLBACK_UPHEAL_BOARD_URL = "https://www.upheal.io/careers";
-const FALLBACK_AWARE_BOARD_URL = "https://www.aware.ie/get-involved/workwithus/";
-const FALLBACK_PIETA_BOARD_URL = "https://www.pieta.ie/careers/#positions";
 const ACTIVELINK_ORIGIN = "https://www.activelink.ie";
 
-type BoardUrlSet = Record<"publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise" | "tem" | "feeld" | "reap" | "coder" | "coreweave" | "upheal" | "aware" | "pieta", string>;
+export const DEFAULT_BOARD_URLS: Record<SourceId, string> = {
+  publicjobs:
+    "https://publicjobs.tal.net/vx/lang-en-GB/mobile-0/appcentre-ext/brand-4/xf-7ecb593daca6/candidate/jobboard/vacancy/3/adv/",
+  activelink: "https://www.activelink.ie/vacancies",
+  roompricegenie: "https://roompricegenie.com/careers/#jobs",
+  pokemon: "https://job-boards.greenhouse.io/pokemoncareers",
+  drcc: "https://www.drcc.ie/about/vacancies/",
+  rise: "https://risecounselling.ie/vacancies/",
+  tem: "https://jobs.ashbyhq.com/tem",
+  feeld: "https://feeld.co/careers",
+  reap: "https://careers.reap.global/jobs",
+  coder: "https://jobs.ashbyhq.com/Coder",
+  coreweave: "https://www.coreweave.com/careers/eu",
+  upheal: "https://www.upheal.io/careers",
+  aware: "https://www.aware.ie/get-involved/workwithus/",
+  pieta: "https://www.pieta.ie/careers/#positions",
+};
+
+type BoardUrlSet = Record<SourceId, string>;
 
 async function readBoardUrls(): Promise<BoardUrlSet> {
-  const fallbackUrls: BoardUrlSet = {
-    publicjobs: FALLBACK_PUBLICJOBS_BOARD_URL,
-    activelink: FALLBACK_ACTIVELINK_BOARD_URL,
-    roompricegenie: FALLBACK_ROOMPRICEGENIE_BOARD_URL,
-    pokemon: FALLBACK_POKEMON_BOARD_URL,
-    drcc: FALLBACK_DRCC_BOARD_URL,
-    rise: FALLBACK_RISE_BOARD_URL,
-    tem: FALLBACK_TEM_BOARD_URL,
-    feeld: FALLBACK_FEELD_BOARD_URL,
-    reap: FALLBACK_REAP_BOARD_URL,
-    coder: FALLBACK_CODER_BOARD_URL,
-    coreweave: FALLBACK_COREWEAVE_BOARD_URL,
-    upheal: FALLBACK_UPHEAL_BOARD_URL,
-    aware: FALLBACK_AWARE_BOARD_URL,
-    pieta: FALLBACK_PIETA_BOARD_URL,
-  };
   try {
     const configFile = Bun.file(SOURCES_CONFIG_PATH);
     if ((await configFile.exists()) === false) {
-      return fallbackUrls;
+      return { ...DEFAULT_BOARD_URLS };
     }
     const configuredSources = (await configFile.json()) as SourceConfig[];
     if (Array.isArray(configuredSources) === false) {
-      return fallbackUrls;
+      return { ...DEFAULT_BOARD_URLS };
     }
-    const resolvedUrls = { ...fallbackUrls };
+    const resolvedUrls: BoardUrlSet = { ...DEFAULT_BOARD_URLS };
     for (const sourceEntry of configuredSources) {
-      if (
-        sourceEntry.id === "publicjobs" ||
-        sourceEntry.id === "activelink" ||
-        sourceEntry.id === "roompricegenie" ||
-        sourceEntry.id === "pokemon" ||
-        sourceEntry.id === "drcc" ||
-        sourceEntry.id === "rise" ||
-        sourceEntry.id === "tem" ||
-        sourceEntry.id === "feeld" ||
-        sourceEntry.id === "reap" ||
-        sourceEntry.id === "coder" ||
-        sourceEntry.id === "coreweave" ||
-        sourceEntry.id === "upheal" ||
-        sourceEntry.id === "aware" ||
-        sourceEntry.id === "pieta"
-      ) {
-        if (typeof sourceEntry.boardUrl === "string" && sourceEntry.boardUrl !== "") {
-          resolvedUrls[sourceEntry.id] = sourceEntry.boardUrl;
-        }
+      if (sourceEntry.id in DEFAULT_BOARD_URLS && typeof sourceEntry.boardUrl === "string" && sourceEntry.boardUrl !== "") {
+        resolvedUrls[sourceEntry.id] = sourceEntry.boardUrl;
       }
     }
     return resolvedUrls;
   } catch (error) {
     console.warn(`Could not read ${SOURCES_CONFIG_PATH}, using fallback board URLs.`, error);
-    return fallbackUrls;
+    return { ...DEFAULT_BOARD_URLS };
   }
 }
 
@@ -93,6 +63,20 @@ const PUBLICJOBS_MAX_PAGES = 12;
 const ACTIVELINK_MAX_PAGES = 18;
 const MAX_JOBS_PER_SOURCE = 900;
 const FIRST_PAGE_INDEX = 0;
+
+function collectJobsCapped<T>(items: Iterable<T>, mapItem: (item: T) => JobListing | null): JobListing[] {
+  const collectedJobs: JobListing[] = [];
+  for (const item of items) {
+    const listing = mapItem(item);
+    if (listing !== null) {
+      collectedJobs.push(listing);
+    }
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+  }
+  return collectedJobs;
+}
 
 const HIDDEN_CONFIG_PATH = "config/hidden.json";
 const OUTPUT_PAYLOAD_PATH = "public/data/jobs.json";
@@ -149,7 +133,7 @@ function sleepMilliseconds(delayMs: number): Promise<void> {
   });
 }
 
-async function fetchHtmlWithTimeout(pageUrl: string): Promise<string> {
+async function fetchTextWithTimeout(pageUrl: string): Promise<string> {
   let lastError: unknown = new Error(`Request failed for ${pageUrl}: no attempts made`);
   for (let attemptNumber = 1; attemptNumber <= FETCH_MAX_ATTEMPTS; attemptNumber += 1) {
     const abortController = new AbortController();
@@ -184,6 +168,62 @@ function cleanFieldText(rawText: string, labelToStrip: string): string {
   return withoutLabel.replace(/\s+/g, " ").trim();
 }
 
+async function scrapeBoardListings(
+  boardName: string,
+  boardUrl: string,
+  parsePage: (html: string, boardUrl: string) => JobListing[] | Promise<JobListing[]>,
+): Promise<JobListing[]> {
+  console.log(`Fetching ${boardName}`);
+  const html = await fetchTextWithTimeout(boardUrl);
+  const jobs = await parsePage(html, boardUrl);
+  if (jobs.length === 0) {
+    console.log(`${boardName} returned no parseable vacancies — site may have changed or no current openings.`);
+  }
+  return jobs;
+}
+
+export function readElementText(selection: { first(): { text(): string } }): string {
+  return selection.first().text().replace(/\s+/g, " ").trim();
+}
+
+function normalizeText(rawText: string | null | undefined): string {
+  return (rawText ?? "").replace(/\s+/g, " ").trim();
+}
+
+export function slugify(rawText: string, maxLength = 0): string {
+  const dashedText = rawText.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (maxLength <= 0 || dashedText.length <= maxLength) {
+    return dashedText;
+  }
+  const truncatedText = dashedText.slice(0, maxLength);
+  const lastSeparatorIndex = truncatedText.lastIndexOf("-");
+  return lastSeparatorIndex > 0 ? truncatedText.slice(0, lastSeparatorIndex) : truncatedText;
+}
+
+interface JobListingFields {
+  id: string;
+  source: SourceId;
+  title: string;
+  url: string;
+  organisation: string;
+  locationRaw: string;
+  summary: string;
+  postedDate: string;
+  closingDate?: string;
+  salary?: string;
+  workMode?: WorkMode;
+}
+
+export function buildJobListing(fields: JobListingFields): JobListing {
+  return {
+    hidden: false,
+    closingDate: "",
+    salary: "",
+    ...fields,
+    workMode: fields.workMode ?? detectWorkMode(fields.locationRaw, fields.title, fields.summary),
+  };
+}
+
 export function parsePublicjobsDate(dateText: string): string {
   const trimmedText = dateText.trim();
   const dateParts = trimmedText.split(/\s+/);
@@ -207,16 +247,10 @@ export function parsePublicjobsDate(dateText: string): string {
 
 export function parseActivelinkDate(dateAttr: string): string {
   const trimmedAttr = dateAttr.trim();
-  if (trimmedAttr === "") {
-    return new Date().toISOString();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedAttr)) {
+    return parseIsoDateOrNow(`${trimmedAttr}T09:00:00.000Z`);
   }
-  const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmedAttr)
-    ? new Date(`${trimmedAttr}T09:00:00.000Z`)
-    : new Date(trimmedAttr);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return new Date().toISOString();
-  }
-  return parsedDate.toISOString();
+  return parseIsoDateOrNow(trimmedAttr);
 }
 
 export function resolvePublicjobsUrl(detailHref: string, boardUrl: string): string {
@@ -309,7 +343,7 @@ async function enrichActivelinkSalaries(
         console.log(`Fetching activelink details ${currentIndex + 1} of ${freshJobs.length}`);
       }
       try {
-        const detailHtml = await fetchHtmlWithTimeout(jobEntry.url);
+        const detailHtml = await fetchTextWithTimeout(jobEntry.url);
         jobEntry.salary = extractSalaryFromDetail(detailHtml);
       } catch (error) {
         console.warn(`Could not fetch details for ${jobEntry.id}, leaving salary empty.`, error);
@@ -360,25 +394,25 @@ export function mapAshbyPostingToListing(
   organisation: string,
 ): JobListing | null {
   const postingId = (posting.id ?? "").trim();
-  const titleText = (posting.title ?? "").replace(/\s+/g, " ").trim();
+  const titleText = normalizeText(posting.title);
   const detailUrl = (posting.jobUrl ?? "").trim();
   if (postingId === "" || titleText === "" || detailUrl === "") {
     return null;
   }
   const locationParts = [posting.location, ...(posting.secondaryLocations ?? []).map((entry) => entry.location)]
-    .map((part) => (part ?? "").replace(/\s+/g, " ").trim())
+    .map(normalizeText)
     .filter((part) => part !== "");
   const locationRaw = locationParts.length > 0 ? [...new Set(locationParts)].join("; ") : "Remote";
   const summaryParts = [posting.team, posting.department, posting.employmentType]
-    .map((part) => (part ?? "").replace(/\s+/g, " ").trim())
+    .map(normalizeText)
     .filter((part) => part !== "");
   const summaryText = [...new Set(summaryParts)].join(" · ");
   const safeUrl = asSafeHttpUrl(detailUrl, "");
   if (safeUrl === "") {
     return null;
   }
-  const postedDate = parseAshbyDate(posting.publishedAt ?? "");
-  return {
+  const postedDate = parseIsoDateOrNow(posting.publishedAt ?? "");
+  return buildJobListing({
     id: `${source}-${postingId.slice(0, 8)}`,
     source,
     title: titleText,
@@ -389,13 +423,12 @@ export function mapAshbyPostingToListing(
     postedDate,
     closingDate: postedDate,
     workMode: detectWorkMode(locationRaw, titleText, summaryText),
-    hidden: false,
-    salary: (posting.compensationTierSummary ?? "").replace(/\s+/g, " ").trim(),
-  };
+    salary: normalizeText(posting.compensationTierSummary),
+  });
 }
 
-function parseAshbyDate(publishedAt: string): string {
-  const trimmedValue = publishedAt.trim();
+export function parseIsoDateOrNow(rawDate: string): string {
+  const trimmedValue = rawDate.trim();
   if (trimmedValue === "") {
     return new Date().toISOString();
   }
@@ -417,7 +450,7 @@ export async function fetchAshbyBoardListings(
   }
   const apiUrl = `${ASHBY_POSTING_API_URL}/${orgSlug}`;
   console.log(`Fetching ${source} jobs from Ashby API`);
-  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  const responseText = await fetchTextWithTimeout(apiUrl);
   let payload: { jobs?: AshbyJobPosting[] };
   try {
     payload = JSON.parse(responseText) as { jobs?: AshbyJobPosting[] };
@@ -427,16 +460,9 @@ export async function fetchAshbyBoardListings(
   if (Array.isArray(payload.jobs) === false) {
     throw new Error(`Ashby API for ${source} returned no job list (${apiUrl}). The board markup or API may have changed.`);
   }
-  const collectedJobs: JobListing[] = [];
-  for (const posting of payload.jobs ?? []) {
-    const listing = mapAshbyPostingToListing(posting, source, organisation);
-    if (listing !== null) {
-      collectedJobs.push(listing);
-    }
-    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
-      break;
-    }
-  }
+  const collectedJobs = collectJobsCapped(payload.jobs ?? [], (posting) =>
+    mapAshbyPostingToListing(posting, source, organisation),
+  );
   if (collectedJobs.length === 0) {
     throw new Error(`Ashby API for ${source} returned no usable listings (${apiUrl}).`);
   }
@@ -460,7 +486,7 @@ export function mapGreenhouseJobToListing(
   organisation: string,
 ): JobListing | null {
   const jobId = String(job.id).trim();
-  const titleText = (job.title ?? "").replace(/\s+/g, " ").trim();
+  const titleText = normalizeText(job.title);
   const detailUrl = (job.absolute_url ?? "").trim();
   if (jobId === "" || titleText === "" || detailUrl === "") {
     return null;
@@ -469,9 +495,9 @@ export function mapGreenhouseJobToListing(
   if (safeUrl === "") {
     return null;
   }
-  const locationRaw = (job.location?.name ?? "").replace(/\s+/g, " ").trim() || "Remote";
-  const postedDate = parseAshbyDate(job.first_published ?? job.updated_at ?? "");
-  return {
+  const locationRaw = normalizeText(job.location?.name) || "Remote";
+  const postedDate = parseIsoDateOrNow(job.first_published ?? job.updated_at ?? "");
+  return buildJobListing({
     id: `${source}-${jobId.slice(0, 8)}`,
     source,
     title: titleText,
@@ -482,9 +508,7 @@ export function mapGreenhouseJobToListing(
     postedDate,
     closingDate: postedDate,
     workMode: detectWorkMode(locationRaw, titleText, ""),
-    hidden: false,
-    salary: "",
-  };
+  });
 }
 
 export async function fetchGreenhouseBoardListings(
@@ -495,7 +519,7 @@ export async function fetchGreenhouseBoardListings(
   const boardSlug = source === "pokemon" ? "pokemoncareers" : source;
   const apiUrl = `${GREENHOUSE_API_URL}/${boardSlug}/jobs`;
   console.log(`Fetching ${source} jobs from Greenhouse API`);
-  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  const responseText = await fetchTextWithTimeout(apiUrl);
   let payload: { jobs?: GreenhouseJob[] };
   try {
     payload = JSON.parse(responseText) as { jobs?: GreenhouseJob[] };
@@ -505,16 +529,9 @@ export async function fetchGreenhouseBoardListings(
   if (Array.isArray(payload.jobs) === false) {
     throw new Error(`Greenhouse API for ${source} returned no job list (${apiUrl}).`);
   }
-  const collectedJobs: JobListing[] = [];
-  for (const job of payload.jobs ?? []) {
-    const listing = mapGreenhouseJobToListing(job, source, organisation);
-    if (listing !== null) {
-      collectedJobs.push(listing);
-    }
-    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
-      break;
-    }
-  }
+  const collectedJobs = collectJobsCapped(payload.jobs ?? [], (job) =>
+    mapGreenhouseJobToListing(job, source, organisation),
+  );
   if (collectedJobs.length === 0) {
     throw new Error(`Greenhouse API for ${source} returned no usable listings (${apiUrl}).`);
   }
@@ -531,10 +548,10 @@ export function parseDrccPage(html: string, boardUrl: string): JobListing[] {
   const locationRaw = locationMatch?.[1]?.replace(/\s+/g, " ").trim() || "Dublin";
   const deadlineMatch = contentText.match(/(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})\s*@\s*COB/i);
   const closingText = deadlineMatch?.[1]?.replace(/(st|nd|rd|th)/g, "").trim() ?? "";
-  const closingDate = closingText !== "" ? parsePublicjobsDate(closingText) : new Date().toISOString();
+  const closingDate = parsePublicjobsDate(closingText);
   const seenTitles = new Set<string>();
   root("h3").each((_i, el) => {
-    const h3Text = root(el).text().replace(/\s+/g, " ").trim();
+    const h3Text = readElementText(root(el));
     if (h3Text === "" || seenTitles.has(h3Text.toLowerCase())) {
       return;
     }
@@ -546,32 +563,26 @@ export function parseDrccPage(html: string, boardUrl: string): JobListing[] {
     const linkEl = root(el).find("a").first();
     const href = linkEl.attr("href") ?? "";
     const jobUrl = href !== "" ? new URL(href, boardUrl).toString() : boardUrl;
-    jobs.push({
-      id: `drcc-${h3Text.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`,
-      source: "drcc",
-      title: h3Text,
-      url: jobUrl,
-      organisation: "Dublin Rape Crisis Centre",
-      locationRaw,
-      summary: `Dublin Rape Crisis Centre · ${locationRaw}`,
-      postedDate: closingDate,
-      closingDate,
-      workMode: detectWorkMode(locationRaw, h3Text, ""),
-      hidden: false,
-      salary,
-    });
+    jobs.push(
+      buildJobListing({
+        id: `drcc-${slugify(h3Text, 40)}`,
+        source: "drcc",
+        title: h3Text,
+        url: jobUrl,
+        organisation: "Dublin Rape Crisis Centre",
+        locationRaw,
+        summary: `Dublin Rape Crisis Centre · ${locationRaw}`,
+        postedDate: closingDate,
+        closingDate,
+        salary,
+      }),
+    );
   });
   return jobs;
 }
 
 export async function fetchDrccListings(boardUrl: string): Promise<JobListing[]> {
-  console.log("Fetching DRCC vacancies page");
-  const html = await fetchHtmlWithTimeout(boardUrl);
-  const jobs = parseDrccPage(html, boardUrl);
-  if (jobs.length === 0) {
-    console.log("DRCC page returned no parseable vacancies — site may have changed or no current openings.");
-  }
-  return jobs;
+  return scrapeBoardListings("DRCC vacancies page", boardUrl, parseDrccPage);
 }
 
 export function parseRisePage(html: string, boardUrl: string): JobListing[] {
@@ -589,35 +600,29 @@ export function parseRisePage(html: string, boardUrl: string): JobListing[] {
     const salary = salaryMatch?.[0] ?? "";
     const closingMatch = rawTitle.match(/closing date\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)[\s,]*(\d{4})/i);
     const closingText = closingMatch ? `${closingMatch[1]} ${closingMatch[2]} ${closingMatch[3]}` : "";
-    const closingDate = closingText !== "" ? parsePublicjobsDate(closingText) : new Date().toISOString();
+    const closingDate = parsePublicjobsDate(closingText);
     const jobUrl = pdfHref.startsWith("http") ? pdfHref : new URL(pdfHref, boardUrl).toString();
     const locationRaw = "Kilcoole, Co. Wicklow";
-    jobs.push({
-      id: `rise-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`,
-      source: "rise",
-      title,
-      url: jobUrl,
-      organisation: "RISE Counselling",
-      locationRaw,
-      summary: `RISE Counselling · ${locationRaw}`,
-      postedDate: closingDate,
-      closingDate,
-      workMode: detectWorkMode(locationRaw, title, ""),
-      hidden: false,
-      salary,
-    });
+    jobs.push(
+      buildJobListing({
+        id: `rise-${slugify(title, 40)}`,
+        source: "rise",
+        title,
+        url: jobUrl,
+        organisation: "RISE Counselling",
+        locationRaw,
+        summary: `RISE Counselling · ${locationRaw}`,
+        postedDate: closingDate,
+        closingDate,
+        salary,
+      }),
+    );
   }
   return jobs;
 }
 
 export async function fetchRiseListings(boardUrl: string): Promise<JobListing[]> {
-  console.log("Fetching RISE Counselling vacancies page");
-  const html = await fetchHtmlWithTimeout(boardUrl);
-  const jobs = parseRisePage(html, boardUrl);
-  if (jobs.length === 0) {
-    console.log("RISE page returned no parseable vacancies — site may have changed or no current openings.");
-  }
-  return jobs;
+  return scrapeBoardListings("RISE Counselling vacancies page", boardUrl, parseRisePage);
 }
 
 function extractActivelinkSection(relativeHref: string): string {
@@ -652,7 +657,7 @@ async function fetchPublicjobsListings(boardUrl: string): Promise<JobListing[]> 
     const startOffset = pageIndex * PUBLICJOBS_PAGE_SIZE;
     const pageUrl = startOffset === 0 ? boardUrl : `${boardUrl}?start=${startOffset}`;
     console.log(`Fetching publicjobs page offset ${startOffset}`);
-    const pageHtml = await fetchHtmlWithTimeout(pageUrl);
+    const pageHtml = await fetchTextWithTimeout(pageUrl);
     const cheerioRoot = cheerio.load(pageHtml);
     const jobCards = cheerioRoot("li.opp-container");
     if (jobCards.length === 0) {
@@ -667,7 +672,7 @@ async function fetchPublicjobsListings(boardUrl: string): Promise<JobListing[]> 
       const cardSelection = cheerioRoot(cardElement);
       const opportunityId = cardSelection.attr("data-oppid") ?? "";
       const titleLink = cardSelection.find("a.subject").first();
-      const titleText = titleLink.text().replace(/\s+/g, " ").trim();
+      const titleText = readElementText(titleLink);
       const detailHref = titleLink.attr("href") ?? boardUrl;
       if (opportunityId === "" || titleText === "") {
         return;
@@ -692,24 +697,22 @@ async function fetchPublicjobsListings(boardUrl: string): Promise<JobListing[]> 
         cardSelection.find(".candidate-opp-field-8").first().text(),
         "Closing Date:",
       );
-      const postedDate = advertisingText === "" ? new Date().toISOString() : parsePublicjobsDate(advertisingText);
+      const postedDate = parsePublicjobsDate(advertisingText);
       const closingDate = closingText === "" ? postedDate : parsePublicjobsDate(closingText);
       const summaryText = vacancyType === "" ? organisation : `${vacancyType} at ${organisation}`;
-      const jobId = `publicjobs-${opportunityId}`;
-      collectedJobs.push({
-        id: jobId,
-        source: "publicjobs",
-        title: titleText,
-        url: resolvePublicjobsUrl(detailHref, boardUrl),
-        organisation: organisation === "" ? "Publicjobs role" : organisation,
-        locationRaw: locationRaw === "" ? "Ireland" : locationRaw,
-        summary: summaryText,
-        postedDate,
-        closingDate,
-        workMode: detectWorkMode(locationRaw, titleText, summaryText),
-        hidden: false,
-        salary: "",
-      });
+      collectedJobs.push(
+        buildJobListing({
+          id: `publicjobs-${opportunityId}`,
+          source: "publicjobs",
+          title: titleText,
+          url: resolvePublicjobsUrl(detailHref, boardUrl),
+          organisation: organisation === "" ? "Publicjobs role" : organisation,
+          locationRaw: locationRaw === "" ? "Ireland" : locationRaw,
+          summary: summaryText,
+          postedDate,
+          closingDate,
+        }),
+      );
     });
     if (jobCards.length < PUBLICJOBS_PAGE_SIZE) {
       break;
@@ -730,7 +733,7 @@ async function fetchActivelinkListings(
   for (let pageIndex = FIRST_PAGE_INDEX; pageIndex < ACTIVELINK_MAX_PAGES; pageIndex += 1) {
     const pageUrl = pageIndex === 0 ? boardUrl : `${boardUrl}?page=${pageIndex}`;
     console.log(`Fetching activelink page ${pageIndex}`);
-    const pageHtml = await fetchHtmlWithTimeout(pageUrl);
+    const pageHtml = await fetchTextWithTimeout(pageUrl);
     const cheerioRoot = cheerio.load(pageHtml);
     const teaserCards = cheerioRoot("article.teaser");
     if (teaserCards.length === 0) {
@@ -744,32 +747,22 @@ async function fetchActivelinkListings(
     teaserCards.each((_cardIndex, cardElement) => {
       const cardSelection = cheerioRoot(cardElement);
       const titleLink = cardSelection.find(".teaser__title a").first();
-      const titleText = titleLink.find(".field--name-title").text().replace(/\s+/g, " ").trim();
+      const titleText = readElementText(titleLink.find(".field--name-title"));
       const relativeHref = titleLink.attr("href") ?? "";
       if (titleText === "" || relativeHref === "") {
         return;
       }
       const idMatch = relativeHref.match(/\/(\d+)-/);
       const numericId = idMatch?.[1] ?? relativeHref.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-      const summaryText = cardSelection
-        .find(".teaser__text-inner p")
-        .first()
-        .text()
-        .replace(/\s+/g, " ")
-        .trim();
-      const locationRaw = cardSelection
-        .find(".teaser__region .icon-text__text")
-        .first()
-        .text()
-        .replace(/\s+/g, " ")
-        .trim();
+      const summaryText = readElementText(cardSelection.find(".teaser__text-inner p"));
+      const locationRaw = readElementText(cardSelection.find(".teaser__region .icon-text__text"));
       const postedAttr = cardSelection.find(".icon-text--start time").first().attr("datetime") ?? "";
       const closingAttr = cardSelection.find(".icon-text--expiry time").first().attr("datetime") ?? "";
       const postedDate = parseActivelinkDate(postedAttr);
       const closingDate = closingAttr === "" ? postedDate : parseActivelinkDate(closingAttr);
       const categoryTexts: string[] = [];
       cardSelection.find(".category-list__item a").each((_tagIndex, tagElement) => {
-        const tagText = cheerioRoot(tagElement).text().replace(/\s+/g, " ").trim();
+        const tagText = readElementText(cheerioRoot(tagElement));
         if (tagText !== "") {
           categoryTexts.push(tagText);
         }
@@ -782,21 +775,19 @@ async function fetchActivelinkListings(
         titleText,
         categoryText === "" ? "Community role" : categoryText,
       );
-      const jobId = `activelink-${numericId}`;
-      collectedJobs.push({
-        id: jobId,
-        source: "activelink",
-        title: titleText,
-        url: `${ACTIVELINK_ORIGIN}${relativeHref}`,
-        organisation,
-        locationRaw: locationRaw === "" ? "Ireland" : locationRaw,
-        summary: summaryText,
-        postedDate,
-        closingDate,
-        workMode: detectWorkMode(locationRaw, titleText, summaryText),
-        hidden: false,
-        salary: "",
-      });
+      collectedJobs.push(
+        buildJobListing({
+          id: `activelink-${numericId}`,
+          source: "activelink",
+          title: titleText,
+          url: `${ACTIVELINK_ORIGIN}${relativeHref}`,
+          organisation,
+          locationRaw: locationRaw === "" ? "Ireland" : locationRaw,
+          summary: summaryText,
+          postedDate,
+          closingDate,
+        }),
+      );
     });
     if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
       break;
@@ -808,13 +799,13 @@ async function fetchActivelinkListings(
 }
 
 function stripHtmlTags(html: string): string {
-  return html.replace(/<[^>]*>/g, " ").replace(/&[^;]+;/g, " ").replace(/\s+/g, " ").trim();
+  return cheerio.load(html.replace(/<[^>]+>/g, " ")).text().replace(/\s+/g, " ").trim();
 }
 
 export async function fetchReapListings(boardUrl: string): Promise<JobListing[]> {
   const apiUrl = "https://careers.reap.global/jobs.json";
   console.log(`Fetching Reap jobs from ${apiUrl}`);
-  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  const responseText = await fetchTextWithTimeout(apiUrl);
   let payload: { items?: Array<{ id?: string; title?: string; url?: string; date_published?: string; content_html?: string }> };
   try {
     payload = JSON.parse(responseText) as typeof payload;
@@ -831,20 +822,20 @@ export async function fetchReapListings(boardUrl: string): Promise<JobListing[]>
     }
     const description = item.content_html ? stripHtmlTags(item.content_html) : "";
     const salaryMatch = description.match(/(?:salary|compensation)[:\s]*([€£$][\d,.\s-]+(?:per\s+(?:annum|month|hour|year))?)/i);
-    collectedJobs.push({
-      id: `reap-${item.id ?? item.url.split("/").pop() ?? Date.now()}`,
-      source: "reap",
-      title: item.title,
-      url: item.url,
-      organisation: "",
-      locationRaw: "",
-      summary: description,
-      salary: salaryMatch?.[1] ?? "",
-      postedDate: item.date_published ? new Date(item.date_published).toISOString() : new Date().toISOString(),
-      closingDate: "",
-      workMode: "onsite" as const,
-      hidden: false,
-    });
+    collectedJobs.push(
+      buildJobListing({
+        id: `reap-${item.id ?? item.url.split("/").pop() ?? Date.now()}`,
+        source: "reap",
+        title: item.title,
+        url: item.url,
+        organisation: "",
+        locationRaw: "",
+        summary: description,
+        salary: salaryMatch?.[1] ?? "",
+        postedDate: parseIsoDateOrNow(item.date_published ?? ""),
+        workMode: "onsite",
+      }),
+    );
     if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
       break;
     }
@@ -857,7 +848,7 @@ export async function fetchReapListings(boardUrl: string): Promise<JobListing[]>
 
 export async function fetchFeeldListings(boardUrl: string): Promise<JobListing[]> {
   console.log(`Fetching Feeld jobs from ${boardUrl}`);
-  const html = await fetchHtmlWithTimeout(boardUrl);
+  const html = await fetchTextWithTimeout(boardUrl);
   const root = cheerio.load(html);
   const jobUrls: string[] = [];
   root("a[href*='feeldco.workable.com/jobs/']").each((_index, element) => {
@@ -875,7 +866,7 @@ export async function fetchFeeldListings(boardUrl: string): Promise<JobListing[]
       break;
     }
     try {
-      const detailHtml = await fetchHtmlWithTimeout(jobUrl);
+      const detailHtml = await fetchTextWithTimeout(jobUrl);
       const titleMatch = detailHtml.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/i);
       const title = titleMatch?.[1]?.replace(/ - Feeld$/, "").trim() ?? "";
       if (!title) {
@@ -883,20 +874,19 @@ export async function fetchFeeldListings(boardUrl: string): Promise<JobListing[]
       }
       const descMatch = detailHtml.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i);
       const description = descMatch?.[1] ?? "";
-      collectedJobs.push({
-        id: `feeld-${jobUrl.split("/").pop() ?? Date.now()}`,
-        source: "feeld",
-        title,
-        url: jobUrl,
-        organisation: "",
-        locationRaw: "",
-        summary: description,
-        salary: "",
-        postedDate: new Date().toISOString(),
-        closingDate: "",
-        workMode: "onsite" as const,
-        hidden: false,
-      });
+      collectedJobs.push(
+        buildJobListing({
+          id: `feeld-${jobUrl.split("/").pop() ?? Date.now()}`,
+          source: "feeld",
+          title,
+          url: jobUrl,
+          organisation: "",
+          locationRaw: "",
+          summary: description,
+          postedDate: new Date().toISOString(),
+          workMode: "onsite",
+        }),
+      );
     } catch (error) {
       console.warn(`Could not fetch Feeld detail page ${jobUrl}`, error);
     }
@@ -917,7 +907,7 @@ export async function fetchCoreweaveListings(
 ): Promise<JobListing[]> {
   const apiUrl = `${GREENHOUSE_API_URL}/coreweaveu/jobs`;
   console.log(`Fetching CoreWeave jobs from Greenhouse API`);
-  const responseText = await fetchHtmlWithTimeout(apiUrl);
+  const responseText = await fetchTextWithTimeout(apiUrl);
   let payload: { jobs?: GreenhouseJob[] };
   try {
     payload = JSON.parse(responseText) as { jobs?: GreenhouseJob[] };
@@ -927,21 +917,14 @@ export async function fetchCoreweaveListings(
   if (Array.isArray(payload.jobs) === false) {
     throw new Error(`CoreWeave API returned no job list (${apiUrl}).`);
   }
-  const collectedJobs: JobListing[] = [];
-  for (const job of payload.jobs ?? []) {
+  const collectedJobs = collectJobsCapped(payload.jobs ?? [], (job) => {
     const locationName = (job.location?.name ?? "").toLowerCase();
     const isAllowed = COREWEAVE_ALLOWED_LOCATIONS.some((allowed) => locationName.includes(allowed));
     if (!isAllowed) {
-      continue;
+      return null;
     }
-    const listing = mapGreenhouseJobToListing(job, source, organisation);
-    if (listing !== null) {
-      collectedJobs.push(listing);
-    }
-    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
-      break;
-    }
-  }
+    return mapGreenhouseJobToListing(job, source, organisation);
+  });
   if (collectedJobs.length === 0) {
     throw new Error(`CoreWeave API returned no Ireland/EMEA listings (${apiUrl}).`);
   }
@@ -957,7 +940,7 @@ function normalizeUrlForLookup(rawUrl: string): string {
 async function fetchSitemapLastModified(sitemapUrl: string): Promise<Map<string, string>> {
   const lastModifiedByUrl = new Map<string, string>();
   try {
-    const sitemapXml = await fetchHtmlWithTimeout(sitemapUrl);
+    const sitemapXml = await fetchTextWithTimeout(sitemapUrl);
     const sitemapRoot = cheerio.load(sitemapXml, { xmlMode: true });
     sitemapRoot("url").each((_index, urlElement) => {
       const urlSelection = sitemapRoot(urlElement);
@@ -983,7 +966,7 @@ export function parseUphealPage(
   const seenUrls = new Set<string>();
   root(".uui-career06_list-wrapper .collection-item").each((_index, element) => {
     const card = root(element);
-    const title = card.find(".uui-career06_heading").first().text().replace(/\s+/g, " ").trim();
+    const title = readElementText(card.find(".uui-career06_heading"));
     const href = card.find(".uui-button-wrapper-2 a").first().attr("href") ?? "";
     if (title === "" || href === "") {
       return;
@@ -993,10 +976,10 @@ export function parseUphealPage(
       return;
     }
     seenUrls.add(jobUrl);
-    const department = card.find(".uui-badge").first().text().replace(/\s+/g, " ").trim();
+    const department = readElementText(card.find(".uui-badge"));
     const detailTexts: string[] = [];
     card.find(".uui-career06_detail-wrapper").each((_detailIndex, detailElement) => {
-      const detailText = root(detailElement).text().replace(/\s+/g, " ").trim();
+      const detailText = readElementText(root(detailElement));
       if (detailText !== "") {
         detailTexts.push(detailText);
       }
@@ -1005,37 +988,30 @@ export function parseUphealPage(
     const employmentType = detailTexts[1] ?? "";
     const summaryParts = [department, employmentType].filter((part) => part !== "");
     const summary = summaryParts.length > 0 ? summaryParts.join(" · ") : "Upheal";
-    const slug = normalizeUrlForLookup(jobUrl).split("/").pop() ?? title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const postedDate = parseAshbyDate(postedDates.get(normalizeUrlForLookup(jobUrl)) ?? "");
-    jobs.push({
-      id: `upheal-${slug}`,
-      source: "upheal",
-      title,
-      url: jobUrl,
-      organisation: "Upheal",
-      locationRaw,
-      summary,
-      postedDate,
-      closingDate: "",
-      workMode: detectWorkMode(locationRaw, title, summary),
-      hidden: false,
-      salary: "",
-    });
+    const normalizedUrl = normalizeUrlForLookup(jobUrl);
+    const slug = normalizedUrl.split("/").pop() ?? slugify(title);
+    const postedDate = parseIsoDateOrNow(postedDates.get(normalizedUrl) ?? "");
+    jobs.push(
+      buildJobListing({
+        id: `upheal-${slug}`,
+        source: "upheal",
+        title,
+        url: jobUrl,
+        organisation: "Upheal",
+        locationRaw,
+        summary,
+        postedDate,
+      }),
+    );
   });
   return jobs;
 }
 
 export async function fetchUphealListings(boardUrl: string): Promise<JobListing[]> {
-  console.log(`Fetching Upheal careers from ${boardUrl}`);
-  const [html, postedDates] = await Promise.all([
-    fetchHtmlWithTimeout(boardUrl),
-    fetchSitemapLastModified(UPHEAL_SITEMAP_URL),
-  ]);
-  const jobs = parseUphealPage(html, boardUrl, postedDates);
-  if (jobs.length === 0) {
-    console.log("Upheal page returned no parseable vacancies — site may have changed or no current openings.");
-  }
-  return jobs;
+  const postedDatesPromise = fetchSitemapLastModified(UPHEAL_SITEMAP_URL);
+  return scrapeBoardListings("Upheal careers", boardUrl, async (html, url) =>
+    parseUphealPage(html, url, await postedDatesPromise),
+  );
 }
 
 export interface PietaJobDetail {
@@ -1059,20 +1035,15 @@ export function parsePietaDetail(html: string): PietaJobDetail {
   const infoByLabel = new Map<string, string>();
   root(".career_overview__info_row").each((_index, rowElement) => {
     const row = root(rowElement);
-    const label = row
-      .find(".career_overview__info_label")
-      .first()
-      .text()
-      .replace(/\s+/g, " ")
-      .trim()
+    const label = readElementText(row.find(".career_overview__info_label"))
       .replace(/:$/, "")
       .toLowerCase();
-    const value = row.find(".career_overview__info_value").first().text().replace(/\s+/g, " ").trim();
+    const value = readElementText(row.find(".career_overview__info_value"));
     if (label !== "" && value !== "") {
       infoByLabel.set(label, value);
     }
   });
-  const closingDate = parsePietaClosingDate(root(".block_careers_detail").text().replace(/\s+/g, " "));
+  const closingDate = parsePietaClosingDate(readElementText(root(".block_careers_detail")));
   return {
     locationRaw: infoByLabel.get("location") ?? "",
     positionType: infoByLabel.get("position type") ?? "",
@@ -1087,21 +1058,21 @@ export function parsePietaPage(html: string, boardUrl: string): JobListing[] {
   const seenIds = new Set<string>();
   root(".block_open_positions__tab[data-tab='all'] .career_preview").each((_index, element) => {
     const card = root(element);
-    const title = card.find(".career_preview__heading").first().text().replace(/\s+/g, " ").trim();
+    const title = readElementText(card.find(".career_preview__heading"));
     const href = card.attr("href") ?? "";
     if (title === "" || href === "") {
       return;
     }
     const jobUrl = resolveBoardUrl(href, boardUrl);
-    const slug = normalizeUrlForLookup(jobUrl).split("/").pop() ?? title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const slug = normalizeUrlForLookup(jobUrl).split("/").pop() ?? slugify(title);
     if (seenIds.has(slug)) {
       return;
     }
     seenIds.add(slug);
-    const excerpt = card.find(".career_preview__excerpt").first().text().replace(/\s+/g, " ").trim();
+    const excerpt = readElementText(card.find(".career_preview__excerpt"));
     const labels: string[] = [];
     card.find(".career_preview__labels .label").each((_labelIndex, labelElement) => {
-      const labelText = root(labelElement).text().replace(/\s+/g, " ").trim();
+      const labelText = readElementText(root(labelElement));
       if (labelText !== "") {
         labels.push(labelText);
       }
@@ -1109,20 +1080,18 @@ export function parsePietaPage(html: string, boardUrl: string): JobListing[] {
     const locationRaw = labels[0] ?? "Ireland";
     const category = labels[1] ?? "";
     const summary = excerpt !== "" ? excerpt : category === "" ? "Pieta" : category;
-    jobs.push({
-      id: `pieta-${slug}`,
-      source: "pieta",
-      title,
-      url: jobUrl,
-      organisation: "Pieta",
-      locationRaw,
-      summary,
-      postedDate: new Date().toISOString(),
-      closingDate: "",
-      workMode: detectWorkMode(locationRaw, title, summary),
-      hidden: false,
-      salary: "",
-    });
+    jobs.push(
+      buildJobListing({
+        id: `pieta-${slug}`,
+        source: "pieta",
+        title,
+        url: jobUrl,
+        organisation: "Pieta",
+        locationRaw,
+        summary,
+        postedDate: new Date().toISOString(),
+      }),
+    );
   });
   return jobs;
 }
@@ -1132,12 +1101,12 @@ export async function fetchPietaListings(
   previousPostedDates: Map<string, string> = new Map<string, string>(),
 ): Promise<JobListing[]> {
   console.log(`Fetching Pieta careers from ${boardUrl}`);
-  const html = await fetchHtmlWithTimeout(boardUrl);
+  const html = await fetchTextWithTimeout(boardUrl);
   const jobs = parsePietaPage(html, boardUrl);
   for (const job of jobs) {
     job.postedDate = previousPostedDates.get(job.id) ?? job.postedDate;
     try {
-      const detailHtml = await fetchHtmlWithTimeout(job.url);
+      const detailHtml = await fetchTextWithTimeout(job.url);
       const detail = parsePietaDetail(detailHtml);
       if (detail.locationRaw !== "") {
         job.locationRaw = detail.locationRaw;
@@ -1173,7 +1142,7 @@ export function parseAwareModifiedDate(html: string): string {
   const modifiedMatch =
     html.match(/<meta[^>]*property=["']article:modified_time["'][^>]*content=["']([^"']+)["']/i) ??
     html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']article:modified_time["']/i);
-  return parseAshbyDate(modifiedMatch?.[1] ?? "");
+  return parseIsoDateOrNow(modifiedMatch?.[1] ?? "");
 }
 
 export function parseAwarePage(html: string, boardUrl: string): JobListing[] {
@@ -1183,7 +1152,7 @@ export function parseAwarePage(html: string, boardUrl: string): JobListing[] {
   root("a.elementor-cta").each((_index, element) => {
     const card = root(element);
     const href = card.attr("href") ?? "";
-    const title = card.find(".elementor-cta__title").first().text().replace(/\s+/g, " ").trim();
+    const title = readElementText(card.find(".elementor-cta__title"));
     if (href === "" || title === "") {
       return;
     }
@@ -1195,33 +1164,24 @@ export function parseAwarePage(html: string, boardUrl: string): JobListing[] {
       .replace(/\s+/g, " ")
       .trim();
     const locationRaw = AWARE_ROLE_LOCATIONS[href] ?? "Nationwide";
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    jobs.push({
-      id: `aware-${slug}`,
-      source: "aware",
-      title,
-      url: resolveBoardUrl(href, boardUrl),
-      organisation: "Aware",
-      locationRaw,
-      summary: description === "" ? "Counselling Service" : description,
-      postedDate,
-      closingDate: "",
-      workMode: detectWorkMode(locationRaw, title, description),
-      hidden: false,
-      salary: "",
-    });
+    jobs.push(
+      buildJobListing({
+        id: `aware-${slugify(title)}`,
+        source: "aware",
+        title,
+        url: resolveBoardUrl(href, boardUrl),
+        organisation: "Aware",
+        locationRaw,
+        summary: description === "" ? "Counselling Service" : description,
+        postedDate,
+      }),
+    );
   });
   return jobs;
 }
 
 export async function fetchAwareListings(boardUrl: string): Promise<JobListing[]> {
-  console.log(`Fetching Aware work-with-us page from ${boardUrl}`);
-  const html = await fetchHtmlWithTimeout(boardUrl);
-  const jobs = parseAwarePage(html, boardUrl);
-  if (jobs.length === 0) {
-    console.log("Aware page returned no parseable roles — site may have changed.");
-  }
-  return jobs;
+  return scrapeBoardListings("Aware work-with-us page", boardUrl, parseAwarePage);
 }
 
 async function readHiddenIds(): Promise<Set<string>> {
@@ -1245,29 +1205,62 @@ async function readHiddenIds(): Promise<Set<string>> {
 
 const MIN_EXPECTED_JOBS = 80;
 
+interface FetchContext {
+  boardUrls: BoardUrlSet;
+  previousSalaries: Map<string, string>;
+  previousPostedDates: Map<string, string>;
+}
+
+interface SourceDefinition {
+  label: string;
+  fetchJobs: (context: FetchContext) => Promise<JobListing[]>;
+}
+
+const SOURCE_REGISTRY: Record<SourceId, SourceDefinition> = {
+  publicjobs: { label: "Publicjobs", fetchJobs: ({ boardUrls }) => fetchPublicjobsListings(boardUrls.publicjobs) },
+  activelink: {
+    label: "Activelink",
+    fetchJobs: ({ boardUrls, previousSalaries }) => fetchActivelinkListings(boardUrls.activelink, previousSalaries),
+  },
+  roompricegenie: {
+    label: "RoomPriceGenie",
+    fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
+  },
+  pokemon: {
+    label: "Pokemon",
+    fetchJobs: ({ boardUrls }) => fetchGreenhouseBoardListings("pokemon", "The Pokémon Company International", boardUrls.pokemon),
+  },
+  drcc: { label: "DRCC", fetchJobs: ({ boardUrls }) => fetchDrccListings(boardUrls.drcc) },
+  rise: { label: "RISE Counselling", fetchJobs: ({ boardUrls }) => fetchRiseListings(boardUrls.rise) },
+  tem: { label: "Tem", fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("tem", "Tem", boardUrls.tem) },
+  feeld: { label: "Feeld", fetchJobs: ({ boardUrls }) => fetchFeeldListings(boardUrls.feeld) },
+  reap: { label: "Reap", fetchJobs: ({ boardUrls }) => fetchReapListings(boardUrls.reap) },
+  coder: { label: "Coder", fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("coder", "Coder", boardUrls.coder) },
+  coreweave: {
+    label: "CoreWeave",
+    fetchJobs: ({ boardUrls }) => fetchCoreweaveListings("coreweave", "CoreWeave", boardUrls.coreweave),
+  },
+  upheal: { label: "Upheal", fetchJobs: ({ boardUrls }) => fetchUphealListings(boardUrls.upheal) },
+  aware: { label: "Aware", fetchJobs: ({ boardUrls }) => fetchAwareListings(boardUrls.aware) },
+  pieta: {
+    label: "Pieta",
+    fetchJobs: ({ boardUrls, previousPostedDates }) => fetchPietaListings(boardUrls.pieta, previousPostedDates),
+  },
+};
+
+const SOURCE_IDS = Object.keys(SOURCE_REGISTRY) as SourceId[];
+
 async function mainFetch(): Promise<void> {
   const boardUrls = await readBoardUrls();
   const previousJobs = await readPreviousPayloadJobs();
-  const previousSalaries = new Map(previousJobs.map((jobEntry) => [jobEntry.id, jobEntry.salary ?? ""]));
-  const previousPostedDates = new Map(previousJobs.map((jobEntry) => [jobEntry.id, jobEntry.postedDate]));
+  const context: FetchContext = {
+    boardUrls,
+    previousSalaries: new Map(previousJobs.map((jobEntry) => [jobEntry.id, jobEntry.salary ?? ""])),
+    previousPostedDates: new Map(previousJobs.map((jobEntry) => [jobEntry.id, jobEntry.postedDate])),
+  };
   const hiddenIds = await readHiddenIds();
-  const [publicjobsJobs, activelinkJobs, roompricegenieJobs, pokemonJobs, drccJobs, riseJobs, temJobs, feeldJobs, reapJobs, coderJobs, coreweaveJobs, uphealJobs, awareJobs, pietaJobs] = await Promise.all([
-    fetchPublicjobsListings(boardUrls.publicjobs),
-    fetchActivelinkListings(boardUrls.activelink, previousSalaries),
-    fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
-    fetchGreenhouseBoardListings("pokemon", "The Pokémon Company International", boardUrls.pokemon),
-    fetchDrccListings(boardUrls.drcc),
-    fetchRiseListings(boardUrls.rise),
-    fetchAshbyBoardListings("tem", "Tem", boardUrls.tem),
-    fetchFeeldListings(boardUrls.feeld),
-    fetchReapListings(boardUrls.reap),
-    fetchAshbyBoardListings("coder", "Coder", boardUrls.coder),
-    fetchCoreweaveListings("coreweave", "CoreWeave", boardUrls.coreweave),
-    fetchUphealListings(boardUrls.upheal),
-    fetchAwareListings(boardUrls.aware),
-    fetchPietaListings(boardUrls.pieta, previousPostedDates),
-  ]);
-  const combinedJobs: JobListing[] = [...publicjobsJobs, ...activelinkJobs, ...roompricegenieJobs, ...pokemonJobs, ...drccJobs, ...riseJobs, ...temJobs, ...feeldJobs, ...reapJobs, ...coderJobs, ...coreweaveJobs, ...uphealJobs, ...awareJobs, ...pietaJobs].map((jobEntry) => ({
+  const jobsBySource = await Promise.all(SOURCE_IDS.map((sourceId) => SOURCE_REGISTRY[sourceId].fetchJobs(context)));
+  const combinedJobs: JobListing[] = jobsBySource.flat().map((jobEntry) => ({
     ...jobEntry,
     hidden: hiddenIds.has(jobEntry.id),
   }));
@@ -1279,22 +1272,11 @@ async function mainFetch(): Promise<void> {
   combinedJobs.sort((firstJob, secondJob) => Date.parse(secondJob.postedDate) - Date.parse(firstJob.postedDate));
   const payload: JobsPayload = {
     generatedAt: new Date().toISOString(),
-    sources: [
-      { id: "publicjobs" as SourceId, label: "Publicjobs", boardUrl: boardUrls.publicjobs },
-      { id: "activelink" as SourceId, label: "Activelink", boardUrl: boardUrls.activelink },
-      { id: "roompricegenie" as SourceId, label: "RoomPriceGenie", boardUrl: boardUrls.roompricegenie },
-      { id: "pokemon" as SourceId, label: "Pokemon", boardUrl: boardUrls.pokemon },
-      { id: "drcc" as SourceId, label: "DRCC", boardUrl: boardUrls.drcc },
-      { id: "rise" as SourceId, label: "RISE Counselling", boardUrl: boardUrls.rise },
-      { id: "tem" as SourceId, label: "Tem", boardUrl: boardUrls.tem },
-      { id: "feeld" as SourceId, label: "Feeld", boardUrl: boardUrls.feeld },
-      { id: "reap" as SourceId, label: "Reap", boardUrl: boardUrls.reap },
-      { id: "coder" as SourceId, label: "Coder", boardUrl: boardUrls.coder },
-      { id: "coreweave" as SourceId, label: "CoreWeave", boardUrl: boardUrls.coreweave },
-      { id: "upheal" as SourceId, label: "Upheal", boardUrl: boardUrls.upheal },
-      { id: "aware" as SourceId, label: "Aware", boardUrl: boardUrls.aware },
-      { id: "pieta" as SourceId, label: "Pieta", boardUrl: boardUrls.pieta },
-    ],
+    sources: SOURCE_IDS.map((sourceId) => ({
+      id: sourceId,
+      label: SOURCE_REGISTRY[sourceId].label,
+      boardUrl: boardUrls[sourceId],
+    })),
     jobs: combinedJobs,
   };
   await Bun.write(OUTPUT_PAYLOAD_PATH, JSON.stringify(payload, null, 2));

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildJobListing,
   extractSalaryFromDetail,
   fetchCoreweaveListings,
   fetchFeeldListings,
@@ -11,14 +12,92 @@ import {
   parseActivelinkDate,
   parseAwarePage,
   parseDrccPage,
+  parseIsoDateOrNow,
   parsePietaClosingDate,
   parsePietaDetail,
   parsePietaPage,
   parsePublicjobsDate,
   parseRisePage,
   parseUphealPage,
+  readElementText,
   resolvePublicjobsUrl,
+  slugify,
 } from "./fetch-jobs";
+
+describe("slugify", () => {
+  test("lowercases and dash-separates words", () => {
+    expect(slugify("Helpline Therapist – Support Team")).toBe("helpline-therapist-support-team");
+  });
+
+  test("collapses leading and trailing separators", () => {
+    expect(slugify("  €30k Role!  ")).toBe("30k-role");
+  });
+
+  test("truncates to the max length on a separator boundary", () => {
+    const slug = slugify("Child & Adolescent Psychotherapist Required For Cork", 20);
+    expect(slug.length).toBeLessThanOrEqual(20);
+    expect(slug).toBe("child-adolescent");
+  });
+
+  test("keeps short slugs untouched by truncation", () => {
+    expect(slugify("Therapist", 20)).toBe("therapist");
+  });
+});
+
+describe("parseIsoDateOrNow", () => {
+  test("normalises valid ISO strings", () => {
+    expect(parseIsoDateOrNow("2026-10-21T08:21:21.205Z")).toBe("2026-10-21T08:21:21.205Z");
+  });
+
+  test("falls back to now for empty input", () => {
+    const before = Date.now();
+    const parsed = Date.parse(parseIsoDateOrNow(""));
+    expect(Number.isNaN(parsed)).toBe(false);
+    expect(parsed).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  test("falls back to now for garbage input", () => {
+    const parsed = Date.parse(parseIsoDateOrNow("not a date"));
+    expect(Number.isNaN(parsed)).toBe(false);
+  });
+});
+
+describe("buildJobListing", () => {
+  const baseFields = {
+    id: "drcc-1",
+    source: "drcc" as const,
+    title: "Counsellor",
+    url: "https://example.com/1",
+    organisation: "Example Org",
+    locationRaw: "Dublin",
+    summary: "Support role",
+    postedDate: "2026-09-01T09:00:00.000Z",
+  };
+
+  test("fills hidden, salary and closing date defaults", () => {
+    const listing = buildJobListing(baseFields);
+    expect(listing.hidden).toBe(false);
+    expect(listing.salary).toBe("");
+    expect(listing.closingDate).toBe("");
+  });
+
+  test("detects work mode from the text fields by default", () => {
+    expect(buildJobListing({ ...baseFields, locationRaw: "Remote" }).workMode).toBe("remote");
+    expect(buildJobListing(baseFields).workMode).toBe("onsite");
+  });
+
+  test("respects an explicit work mode override", () => {
+    const listing = buildJobListing({ ...baseFields, locationRaw: "Cork", workMode: "remote" });
+    expect(listing.workMode).toBe("remote");
+  });
+});
+
+describe("readElementText", () => {
+  test("normalises whitespace inside text", () => {
+    const selection = { first: () => ({ text: () => "  Hello\n\t  world  " }) };
+    expect(readElementText(selection)).toBe("Hello world");
+  });
+});
 
 describe("parsePublicjobsDate", () => {
   test("parses a standard board date", () => {
