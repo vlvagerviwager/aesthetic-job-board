@@ -9,7 +9,24 @@ export const THEME_DARK = "dark";
 
 export const DEFAULT_LOCATIONS: string[] = ["Dublin", "Wicklow", "Remote"];
 
-export const SOURCE_OPTIONS: SourceId[] = ["publicjobs", "activelink", "roompricegenie", "pokemon", "drcc", "rise", "tem", "feeld", "reap", "coder", "coreweave", "upheal", "aware", "pieta"];
+export const SOURCE_LABELS: Record<SourceId, string> = {
+  publicjobs: "Publicjobs",
+  activelink: "activelink",
+  roompricegenie: "RoomPriceGenie",
+  pokemon: "Pokemon",
+  drcc: "DRCC",
+  rise: "RISE Counselling",
+  tem: "Tem",
+  feeld: "Feeld",
+  reap: "Reap",
+  coder: "Coder",
+  coreweave: "CoreWeave",
+  upheal: "Upheal",
+  aware: "Aware",
+  pieta: "Pieta",
+};
+
+export const SOURCE_OPTIONS: SourceId[] = Object.keys(SOURCE_LABELS) as SourceId[];
 
 export const LOCATION_OPTIONS: string[] = [
   "Dublin",

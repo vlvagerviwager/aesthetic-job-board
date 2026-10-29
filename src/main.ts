@@ -2,6 +2,7 @@ import {
   DATA_URL,
   DEFAULT_LOCATIONS,
   LOCATION_OPTIONS,
+  SOURCE_LABELS,
   SOURCE_OPTIONS,
   THEME_DARK,
   THEME_LIGHT,
@@ -91,46 +92,7 @@ function formatDate(dateIso: string): string {
 }
 
 function sourceLabel(source: SourceId): string {
-  if (source === "publicjobs") {
-    return "Publicjobs";
-  }
-  if (source === "activelink") {
-    return "activelink";
-  }
-  if (source === "roompricegenie") {
-    return "RoomPriceGenie";
-  }
-  if (source === "pokemon") {
-    return "Pokemon";
-  }
-  if (source === "drcc") {
-    return "DRCC";
-  }
-  if (source === "rise") {
-    return "RISE Counselling";
-  }
-  if (source === "tem") {
-    return "Tem";
-  }
-  if (source === "feeld") {
-    return "Feeld";
-  }
-  if (source === "reap") {
-    return "Reap";
-  }
-  if (source === "coder") {
-    return "Coder";
-  }
-  if (source === "coreweave") {
-    return "CoreWeave";
-  }
-  if (source === "upheal") {
-    return "Upheal";
-  }
-  if (source === "aware") {
-    return "Aware";
-  }
-  return "Pieta";
+  return SOURCE_LABELS[source];
 }
 
 function renderSourceChips(): void {

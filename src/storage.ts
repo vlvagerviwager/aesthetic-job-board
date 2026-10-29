@@ -1,4 +1,5 @@
 import {
+  SOURCE_OPTIONS,
   STORAGE_KEY_FILTERS,
   STORAGE_KEY_HIDDEN_OVERRIDES,
   STORAGE_KEY_THEME,
@@ -20,7 +21,6 @@ export function readSalaryBound(rawValue: unknown, fallbackValue: number | null)
   return Math.floor(parsedValue);
 }
 
-const SOURCE_FILTER_VALUES: SourceId[] = ["publicjobs", "activelink", "roompricegenie"];
 const WORK_MODE_FILTER_VALUES: string[] = ["all", "remote", "hybrid", "onsite"];
 const HIDDEN_FILTER_VALUES: string[] = ["active", "all", "hidden"];
 
@@ -84,7 +84,7 @@ export function readStoredFilters(fallbackFilters: BoardFilters): BoardFilters {
       keyword: typeof parsedValue.keyword === "string" ? parsedValue.keyword : fallbackFilters.keyword,
       sources: Array.isArray(parsedValue.sources)
         ? parsedValue.sources.filter((entry): entry is SourceId =>
-            typeof entry === "string" && (SOURCE_FILTER_VALUES as string[]).includes(entry),
+            typeof entry === "string" && (SOURCE_OPTIONS as string[]).includes(entry),
           )
         : fallbackFilters.sources,
       locations: Array.isArray(parsedValue.locations)
