@@ -18,6 +18,7 @@ import {
   applyTheme,
   getInitialTheme,
   readHiddenOverrides,
+  readSalaryBound,
   readStoredFilters,
   writeHiddenOverrides,
   writeStoredFilters,
@@ -33,15 +34,24 @@ import type {
 import { workModeLabel } from "./workMode";
 import { asSafeHttpUrl } from "./urls";
 
-const DEFAULT_FILTERS: BoardFilters = {
-  keyword: "",
-  sources: [],
-  locations: [...DEFAULT_LOCATIONS],
-  workMode: "all",
-  hidden: "active",
-  salaryMin: null,
-  salaryMax: null,
-};
+export function createDefaultFilters(overrides: Partial<BoardFilters> = {}): BoardFilters {
+  return {
+    keyword: "",
+    sources: [],
+    locations: [...DEFAULT_LOCATIONS],
+    workMode: "all",
+    hidden: "active",
+    salaryMin: null,
+    salaryMax: null,
+    ...overrides,
+  };
+}
+
+const DEFAULT_FILTERS: BoardFilters = createDefaultFilters();
+
+export function toggleItem<T>(items: T[], value: T): T[] {
+  return items.includes(value) ? items.filter((keptItem) => keptItem !== value) : [...items, value];
+}
 
 interface BoardState {
   allJobs: JobListing[];
@@ -95,57 +105,55 @@ function sourceLabel(source: SourceId): string {
   return SOURCE_LABELS[source];
 }
 
-function renderSourceChips(): void {
-  const chipsContainer = getElementByIdOrThrow("sourceChips");
-  chipsContainer.innerHTML = "";
-  for (const sourceOption of SOURCE_OPTIONS) {
-    const isPressed = boardState.filters.sources.includes(sourceOption);
+export function renderChipGroup<T extends string>(chipGroup: {
+  container: HTMLElement;
+  options: readonly T[];
+  label: (option: T) => string;
+  getSelected: () => readonly T[];
+  onToggle: (nextSelected: T[]) => void;
+}): void {
+  const { container, options, label, getSelected, onToggle } = chipGroup;
+  container.innerHTML = "";
+  const selected = getSelected();
+  for (const option of options) {
     const chipButton = document.createElement("button");
     chipButton.type = "button";
     chipButton.className = "chip";
-    chipButton.textContent = sourceLabel(sourceOption);
-    chipButton.setAttribute("aria-pressed", String(isPressed));
+    chipButton.textContent = label(option);
+    chipButton.setAttribute("aria-pressed", String(selected.includes(option)));
     chipButton.addEventListener("click", () => {
-      const currentSources = boardState.filters.sources;
-      if (currentSources.includes(sourceOption)) {
-        boardState.filters.sources = currentSources.filter(
-          (keptSource) => keptSource !== sourceOption,
-        );
-      } else {
-        boardState.filters.sources = [...currentSources, sourceOption];
-      }
-      persistFiltersAndRender();
-      renderSourceChips();
+      onToggle(toggleItem([...getSelected()], option));
     });
-    chipsContainer.appendChild(chipButton);
+    container.appendChild(chipButton);
   }
 }
 
+function renderSourceChips(): void {
+  renderChipGroup<SourceId>({
+    container: getElementByIdOrThrow("sourceChips"),
+    options: SOURCE_OPTIONS,
+    label: sourceLabel,
+    getSelected: () => boardState.filters.sources,
+    onToggle: (nextSources) => {
+      boardState.filters.sources = nextSources;
+      persistFiltersAndRender();
+      renderSourceChips();
+    },
+  });
+}
+
 function renderLocationChips(): void {
-  const chipsContainer = getElementByIdOrThrow("locationChips");
-  chipsContainer.innerHTML = "";
-  for (const locationOption of LOCATION_OPTIONS) {
-    const isPressed = boardState.filters.locations.includes(locationOption);
-    const chipButton = document.createElement("button");
-    chipButton.type = "button";
-    chipButton.className = "chip";
-    chipButton.textContent = locationOption;
-    chipButton.setAttribute("aria-pressed", String(isPressed));
-    chipButton.addEventListener("click", () => {
-      const currentLocations = boardState.filters.locations;
-      const locationIndex = currentLocations.indexOf(locationOption);
-      if (locationIndex >= 0) {
-        boardState.filters.locations = currentLocations.filter(
-          (keptLocation) => keptLocation !== locationOption,
-        );
-      } else {
-        boardState.filters.locations = [...currentLocations, locationOption];
-      }
+  renderChipGroup<string>({
+    container: getElementByIdOrThrow("locationChips"),
+    options: LOCATION_OPTIONS,
+    label: (locationOption) => locationOption,
+    getSelected: () => boardState.filters.locations,
+    onToggle: (nextLocations) => {
+      boardState.filters.locations = nextLocations;
       persistFiltersAndRender();
       renderLocationChips();
-    });
-    chipsContainer.appendChild(chipButton);
-  }
+    },
+  });
 }
 
 function createTag(tagText: string, tagClass: string): HTMLSpanElement {
@@ -315,16 +323,8 @@ function renderJobs(restoreFocusJobId?: string): void {
   }
 }
 
-function readSalaryInput(inputElement: HTMLInputElement): number | null {
-  const trimmedValue = inputElement.value.trim();
-  if (trimmedValue === "") {
-    return null;
-  }
-  const parsedValue = Number(trimmedValue);
-  if (Number.isFinite(parsedValue) === false || parsedValue < 0) {
-    return null;
-  }
-  return Math.floor(parsedValue);
+export function readSalaryInput(inputElement: HTMLInputElement): number | null {
+  return readSalaryBound(inputElement.value.trim(), null);
 }
 
 function syncSalaryInput(inputElement: HTMLInputElement, boundValue: number | null): void {
@@ -383,15 +383,7 @@ function bindFilterControls(): void {
   salaryMaxInput.addEventListener("input", debounce(syncSalaryBounds, SALARY_DEBOUNCE_MS));
   syncSalaryHint();
   clearButton.addEventListener("click", () => {
-    boardState.filters = {
-      keyword: "",
-      sources: [],
-      locations: [],
-      workMode: "all",
-      hidden: "active",
-      salaryMin: null,
-      salaryMax: null,
-    };
+    boardState.filters = createDefaultFilters({ locations: [] });
     keywordInput.value = "";
     workModeSelect.value = "all";
     hiddenSelect.value = "active";

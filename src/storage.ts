@@ -24,6 +24,31 @@ export function readSalaryBound(rawValue: unknown, fallbackValue: number | null)
 const WORK_MODE_FILTER_VALUES: string[] = ["all", "remote", "hybrid", "onsite"];
 const HIDDEN_FILTER_VALUES: string[] = ["active", "all", "hidden"];
 
+function readJsonFromStorage<T>(key: string, fallbackValue: T, normalise: (parsedValue: unknown) => T): T {
+  try {
+    const rawValue = localStorage.getItem(key);
+    if (rawValue === null || rawValue === "") {
+      return fallbackValue;
+    }
+    return normalise(JSON.parse(rawValue));
+  } catch (error) {
+    console.warn(`Could not read ${key}, using fallback.`, error);
+    return fallbackValue;
+  }
+}
+
+function writeJsonToStorage(key: string, value: unknown): void {
+  writeTextToStorage(key, JSON.stringify(value));
+}
+
+function writeTextToStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn(`Could not persist ${key}.`, error);
+  }
+}
+
 export function getInitialTheme(): string {
   const storedTheme = localStorage.getItem(STORAGE_KEY_THEME);
   if (storedTheme === THEME_DARK || storedTheme === THEME_LIGHT) {
@@ -35,21 +60,12 @@ export function getInitialTheme(): string {
 
 export function applyTheme(themeName: string): void {
   document.documentElement.dataset.theme = themeName;
-  try {
-    localStorage.setItem(STORAGE_KEY_THEME, themeName);
-  } catch (error) {
-    console.warn("Could not persist theme, continuing without saving.", error);
-  }
+  writeTextToStorage(STORAGE_KEY_THEME, themeName);
 }
 
 export function readHiddenOverrides(): Record<string, boolean> {
-  try {
-    const rawValue = localStorage.getItem(STORAGE_KEY_HIDDEN_OVERRIDES);
-    if (rawValue === null || rawValue === "") {
-      return {};
-    }
-    const parsedValue = JSON.parse(rawValue) as Record<string, boolean>;
-    if (typeof parsedValue !== "object" || parsedValue === null) {
+  return readJsonFromStorage<Record<string, boolean>>(STORAGE_KEY_HIDDEN_OVERRIDES, {}, (parsedValue) => {
+    if (typeof parsedValue !== "object" || parsedValue === null || Array.isArray(parsedValue)) {
       return {};
     }
     const cleanedOverrides: Record<string, boolean> = {};
@@ -59,58 +75,40 @@ export function readHiddenOverrides(): Record<string, boolean> {
       }
     }
     return cleanedOverrides;
-  } catch (error) {
-    console.warn("Could not read hidden overrides, starting empty.", error);
-    return {};
-  }
+  });
 }
 
 export function writeHiddenOverrides(overrides: Record<string, boolean>): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_HIDDEN_OVERRIDES, JSON.stringify(overrides));
-  } catch (error) {
-    console.warn("Could not persist hidden overrides.", error);
-  }
+  writeJsonToStorage(STORAGE_KEY_HIDDEN_OVERRIDES, overrides);
 }
 
 export function readStoredFilters(fallbackFilters: BoardFilters): BoardFilters {
-  try {
-    const rawValue = localStorage.getItem(STORAGE_KEY_FILTERS);
-    if (rawValue === null || rawValue === "") {
-      return fallbackFilters;
-    }
-    const parsedValue = JSON.parse(rawValue) as Partial<BoardFilters>;
+  return readJsonFromStorage<BoardFilters>(STORAGE_KEY_FILTERS, fallbackFilters, (parsedValue) => {
+    const parsedFilters = parsedValue as Partial<BoardFilters>;
     return {
-      keyword: typeof parsedValue.keyword === "string" ? parsedValue.keyword : fallbackFilters.keyword,
-      sources: Array.isArray(parsedValue.sources)
-        ? parsedValue.sources.filter((entry): entry is SourceId =>
+      keyword: typeof parsedFilters.keyword === "string" ? parsedFilters.keyword : fallbackFilters.keyword,
+      sources: Array.isArray(parsedFilters.sources)
+        ? parsedFilters.sources.filter((entry): entry is SourceId =>
             typeof entry === "string" && (SOURCE_OPTIONS as string[]).includes(entry),
           )
         : fallbackFilters.sources,
-      locations: Array.isArray(parsedValue.locations)
-        ? parsedValue.locations.filter((entry): entry is string => typeof entry === "string")
+      locations: Array.isArray(parsedFilters.locations)
+        ? parsedFilters.locations.filter((entry): entry is string => typeof entry === "string")
         : fallbackFilters.locations,
       workMode:
-        typeof parsedValue.workMode === "string" && WORK_MODE_FILTER_VALUES.includes(parsedValue.workMode)
-          ? parsedValue.workMode
+        typeof parsedFilters.workMode === "string" && WORK_MODE_FILTER_VALUES.includes(parsedFilters.workMode)
+          ? parsedFilters.workMode
           : fallbackFilters.workMode,
       hidden:
-        typeof parsedValue.hidden === "string" && HIDDEN_FILTER_VALUES.includes(parsedValue.hidden)
-          ? parsedValue.hidden
+        typeof parsedFilters.hidden === "string" && HIDDEN_FILTER_VALUES.includes(parsedFilters.hidden)
+          ? parsedFilters.hidden
           : fallbackFilters.hidden,
-      salaryMin: readSalaryBound(parsedValue.salaryMin, fallbackFilters.salaryMin),
-      salaryMax: readSalaryBound(parsedValue.salaryMax, fallbackFilters.salaryMax),
+      salaryMin: readSalaryBound(parsedFilters.salaryMin, fallbackFilters.salaryMin),
+      salaryMax: readSalaryBound(parsedFilters.salaryMax, fallbackFilters.salaryMax),
     };
-  } catch (error) {
-    console.warn("Could not read stored filters, using defaults.", error);
-    return fallbackFilters;
-  }
+  });
 }
 
 export function writeStoredFilters(filters: BoardFilters): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters));
-  } catch (error) {
-    console.warn("Could not persist filters.", error);
-  }
+  writeJsonToStorage(STORAGE_KEY_FILTERS, filters);
 }
