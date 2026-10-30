@@ -23,6 +23,7 @@ import {
   resolvePublicjobsUrl,
   slugify,
 } from "./fetch-jobs";
+import { withMockedFetch } from "../test/helpers";
 
 describe("slugify", () => {
   test("lowercases and dash-separates words", () => {
@@ -294,18 +295,14 @@ describe("fetchReapListings", () => {
         },
       ],
     };
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.resolve(new Response(JSON.stringify(mockJson)))) as unknown as typeof fetch;
-    try {
-      const jobs = await fetchReapListings("https://careers.reap.global/jobs");
-      expect(jobs).toHaveLength(1);
-      expect(jobs[0]?.title).toBe("Billing Analyst");
-      expect(jobs[0]?.source).toBe("reap");
-      expect(jobs[0]?.salary).toBe("€50,000 per annum");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const jobs = await withMockedFetch(
+      () => new Response(JSON.stringify(mockJson)),
+      () => fetchReapListings("https://careers.reap.global/jobs"),
+    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.title).toBe("Billing Analyst");
+    expect(jobs[0]?.source).toBe("reap");
+    expect(jobs[0]?.salary).toBe("€50,000 per annum");
   });
 });
 
@@ -320,24 +317,21 @@ describe("fetchFeeldListings", () => {
       <meta property="og:description" content="We are looking for a Director">
     </head></html>`;
     let fetchCount = 0;
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = ((url: string) => {
-      fetchCount += 1;
-      if (fetchCount === 1) {
-        return Promise.resolve(new Response(mockMainPage, { headers: { "content-type": "text/html" } }));
-      }
-      return Promise.resolve(new Response(mockJobPage, { headers: { "content-type": "text/html" } }));
-    }) as unknown as typeof fetch;
-    try {
-      const jobs = await fetchFeeldListings("https://feeld.co/careers");
-      expect(jobs).toHaveLength(2);
-      expect(jobs[0]?.title).toBe("Director of Global Markets");
-      expect(jobs[0]?.source).toBe("feeld");
-      expect(jobs[0]?.url).toBe("https://feeldco.workable.com/jobs/123");
-      expect(jobs[0]?.summary).toBe("We are looking for a Director");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const jobs = await withMockedFetch(
+      () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(mockMainPage, { headers: { "content-type": "text/html" } });
+        }
+        return new Response(mockJobPage, { headers: { "content-type": "text/html" } });
+      },
+      () => fetchFeeldListings("https://feeld.co/careers"),
+    );
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0]?.title).toBe("Director of Global Markets");
+    expect(jobs[0]?.source).toBe("feeld");
+    expect(jobs[0]?.url).toBe("https://feeldco.workable.com/jobs/123");
+    expect(jobs[0]?.summary).toBe("We are looking for a Director");
   });
 });
 
@@ -350,18 +344,14 @@ describe("fetchCoreweaveListings", () => {
         { id: 3, title: "US Role", absolute_url: "https://example.com/3", location: { name: "New York, USA" }, updated_at: "2026-09-01", first_published: "2026-09-01" },
       ],
     };
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.resolve(new Response(JSON.stringify(mockJson)))) as unknown as typeof fetch;
-    try {
-      const jobs = await fetchCoreweaveListings("coreweave", "CoreWeave", "https://www.coreweave.com/careers/eu");
-      expect(jobs).toHaveLength(2);
-      expect(jobs.map((j) => j.title)).toContain("Dublin Engineer");
-      expect(jobs.map((j) => j.title)).toContain("Europe Role");
-      expect(jobs.map((j) => j.title)).not.toContain("US Role");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const jobs = await withMockedFetch(
+      () => new Response(JSON.stringify(mockJson)),
+      () => fetchCoreweaveListings("coreweave", "CoreWeave", "https://www.coreweave.com/careers/eu"),
+    );
+    expect(jobs).toHaveLength(2);
+    expect(jobs.map((j) => j.title)).toContain("Dublin Engineer");
+    expect(jobs.map((j) => j.title)).toContain("Europe Role");
+    expect(jobs.map((j) => j.title)).not.toContain("US Role");
   });
 });
 
@@ -405,20 +395,17 @@ describe("parseUphealPage", () => {
 describe("fetchUphealListings", () => {
   test("reads posted dates from the sitemap", async () => {
     const sitemapXml = `<urlset><url><loc>https://www.upheal.io/careers/head-of-design</loc><lastmod>2026-10-21T08:21:21.205Z</lastmod></url></urlset>`;
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = ((url: string) => {
-      if (String(url).includes("sitemap.xml")) {
-        return Promise.resolve(new Response(sitemapXml));
-      }
-      return Promise.resolve(new Response(UPHEAL_PAGE_HTML, { headers: { "content-type": "text/html" } }));
-    }) as unknown as typeof fetch;
-    try {
-      const jobs = await fetchUphealListings("https://www.upheal.io/careers");
-      expect(jobs).toHaveLength(1);
-      expect(jobs[0]?.postedDate).toBe("2026-10-21T08:21:21.205Z");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const jobs = await withMockedFetch(
+      (url) => {
+        if (url.includes("sitemap.xml")) {
+          return new Response(sitemapXml);
+        }
+        return new Response(UPHEAL_PAGE_HTML, { headers: { "content-type": "text/html" } });
+      },
+      () => fetchUphealListings("https://www.upheal.io/careers"),
+    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.postedDate).toBe("2026-10-21T08:21:21.205Z");
   });
 });
 
@@ -505,25 +492,22 @@ describe("parsePietaClosingDate", () => {
 
 describe("fetchPietaListings", () => {
   test("enriches listings with detail page salary and closing date", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = ((url: string) => {
-      if (String(url) === "https://www.pieta.ie/careers/") {
-        return Promise.resolve(new Response(PIETA_PAGE_HTML, { headers: { "content-type": "text/html" } }));
-      }
-      return Promise.resolve(new Response(PIETA_DETAIL_HTML, { headers: { "content-type": "text/html" } }));
-    }) as unknown as typeof fetch;
     const previousPostedDates = new Map([
       ["pieta-therapist-helpline-and-service-support-team", "2026-10-01T09:00:00.000Z"],
     ]);
-    try {
-      const jobs = await fetchPietaListings("https://www.pieta.ie/careers/", previousPostedDates);
-      expect(jobs).toHaveLength(1);
-      expect(jobs[0]?.salary).toBe("€23.76 per hour");
-      expect(jobs[0]?.closingDate).toBe("2026-11-11T09:00:00.000Z");
-      expect(jobs[0]?.postedDate).toBe("2026-10-01T09:00:00.000Z");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const jobs = await withMockedFetch(
+      (url) => {
+        if (url === "https://www.pieta.ie/careers/") {
+          return new Response(PIETA_PAGE_HTML, { headers: { "content-type": "text/html" } });
+        }
+        return new Response(PIETA_DETAIL_HTML, { headers: { "content-type": "text/html" } });
+      },
+      () => fetchPietaListings("https://www.pieta.ie/careers/", previousPostedDates),
+    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.salary).toBe("€23.76 per hour");
+    expect(jobs[0]?.closingDate).toBe("2026-11-11T09:00:00.000Z");
+    expect(jobs[0]?.postedDate).toBe("2026-10-01T09:00:00.000Z");
   });
 });
 
