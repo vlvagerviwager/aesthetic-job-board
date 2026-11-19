@@ -16,7 +16,9 @@ export const DEFAULT_BOARD_URLS: Record<SourceId, string> = {
   publicjobs:
     "https://publicjobs.tal.net/vx/lang-en-GB/mobile-0/appcentre-ext/brand-4/xf-7ecb593daca6/candidate/jobboard/vacancy/3/adv/",
   activelink: "https://www.activelink.ie/vacancies",
-  roompricegenie: "https://roompricegenie.com/careers/#jobs",
+  gitbook: "https://www.gitbook.com/careers#open-roles",
+  clickhouse: "https://clickhouse.com/company/careers#job-openings",
+  posthog: "https://posthog.com/careers",
   pokemon: "https://job-boards.greenhouse.io/pokemoncareers",
   drcc: "https://www.drcc.ie/about/vacancies/",
   rise: "https://risecounselling.ie/vacancies/",
@@ -361,7 +363,9 @@ async function enrichActivelinkSalaries(
 }
 const ASHBY_POSTING_API_URL = "https://api.ashbyhq.com/posting-api/job-board";
 const ASHBY_BOARD_SLUGS: Record<string, string> = {
-  roompricegenie: "roompricegenie",
+  gitbook: "gitbook",
+  clickhouse: "clickhouse",
+  posthog: "posthog",
   tem: "tem",
   coder: "Coder",
 };
@@ -376,6 +380,8 @@ export interface AshbyJobPosting {
   secondaryLocations?: Array<{ location?: string }>;
   publishedAt?: string;
   jobUrl?: string;
+  isRemote?: boolean | null;
+  workplaceType?: string | null;
   compensationTierSummary?: string | null;
 }
 
@@ -390,10 +396,11 @@ export function mapAshbyPostingToListing(
   if (postingId === "" || titleText === "" || detailUrl === "") {
     return null;
   }
+  const workplaceType = normalizeText(posting.workplaceType).toLowerCase();
   const locationParts = [posting.location, ...(posting.secondaryLocations ?? []).map((entry) => entry.location)]
     .map(normalizeText)
     .filter((part) => part !== "");
-  const locationRaw = locationParts.length > 0 ? [...new Set(locationParts)].join("; ") : "Remote";
+  const baseLocationRaw = locationParts.length > 0 ? [...new Set(locationParts)].join("; ") : "Remote";
   const summaryParts = [posting.team, posting.department, posting.employmentType]
     .map(normalizeText)
     .filter((part) => part !== "");
@@ -403,6 +410,20 @@ export function mapAshbyPostingToListing(
     return null;
   }
   const postedDate = parseIsoDateOrNow(posting.publishedAt ?? "");
+  const workMode: WorkMode =
+    workplaceType === "remote"
+      ? "remote"
+      : workplaceType === "hybrid"
+        ? "hybrid"
+        : workplaceType === "onsite" || workplaceType === "on-site"
+          ? "onsite"
+          : posting.isRemote === true
+            ? "remote"
+            : detectWorkMode(baseLocationRaw, titleText, summaryText);
+  if (workMode === "remote" && locationParts.some((part) => /\bremote\b/i.test(part)) === false) {
+    locationParts.push("Remote");
+  }
+  const locationRaw = locationParts.length > 0 ? [...new Set(locationParts)].join("; ") : "Remote";
   return buildJobListing({
     id: `${source}-${postingId.slice(0, 8)}`,
     source,
@@ -413,7 +434,7 @@ export function mapAshbyPostingToListing(
     summary: summaryText === "" ? organisation : summaryText,
     postedDate,
     closingDate: postedDate,
-    workMode: detectWorkMode(locationRaw, titleText, summaryText),
+    workMode,
     salary: normalizeText(posting.compensationTierSummary),
   });
 }
@@ -1208,9 +1229,17 @@ const SOURCE_REGISTRY: Record<SourceId, SourceDefinition> = {
     label: "Activelink",
     fetchJobs: ({ boardUrls, previousSalaries }) => fetchActivelinkListings(boardUrls.activelink, previousSalaries),
   },
-  roompricegenie: {
-    label: "RoomPriceGenie",
-    fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("roompricegenie", "RoomPriceGenie", boardUrls.roompricegenie),
+  gitbook: {
+    label: "GitBook",
+    fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("gitbook", "GitBook", boardUrls.gitbook),
+  },
+  clickhouse: {
+    label: "ClickHouse",
+    fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("clickhouse", "ClickHouse", boardUrls.clickhouse),
+  },
+  posthog: {
+    label: "PostHog",
+    fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("posthog", "PostHog", boardUrls.posthog),
   },
   pokemon: {
     label: "Pokemon",

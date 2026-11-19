@@ -1,4 +1,4 @@
-export type SourceId = "publicjobs" | "activelink" | "roompricegenie" | "pokemon" | "drcc" | "rise" | "tem" | "feeld" | "reap" | "coder" | "coreweave" | "upheal" | "aware" | "pieta";
+export type SourceId = "publicjobs" | "activelink" | "gitbook" | "clickhouse" | "posthog" | "pokemon" | "drcc" | "rise" | "tem" | "feeld" | "reap" | "coder" | "coreweave" | "upheal" | "aware" | "pieta";
 
 export type WorkMode = "remote" | "hybrid" | "onsite";
 

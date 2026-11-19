@@ -154,37 +154,103 @@ describe("mapAshbyPostingToListing", () => {
         location: "Remote Germany",
         secondaryLocations: [{ location: "Remote Portugal" }],
         publishedAt: "2026-08-19T10:23:43.607+00:00",
-        jobUrl: "https://jobs.ashbyhq.com/roompricegenie/1a8e6c59",
+        jobUrl: "https://jobs.ashbyhq.com/tem/1a8e6c59",
         compensationTierSummary: null,
       },
-      "roompricegenie",
-      "RoomPriceGenie",
+      "tem",
+      "Tem",
     );
-    expect(listing?.id).toBe("roompricegenie-1a8e6c59");
+    expect(listing?.id).toBe("tem-1a8e6c59");
     expect(listing?.locationRaw).toBe("Remote Germany; Remote Portugal");
     expect(listing?.workMode).toBe("remote");
     expect(listing?.postedDate).toBe("2026-08-19T10:23:43.607Z");
     expect(listing?.salary).toBe("");
   });
 
+  test("uses Ashby workplaceType for remote roles", () => {
+    const listing = mapAshbyPostingToListing(
+      {
+        id: "abc12345",
+        title: "Field Marketing Manager",
+        location: "Europe (+/- 3 hours)",
+        publishedAt: "2026-09-15T08:14:40.542+00:00",
+        jobUrl: "https://jobs.ashbyhq.com/GitBook/abc12345",
+        isRemote: true,
+        workplaceType: "Remote",
+      },
+      "gitbook",
+      "GitBook",
+    );
+    expect(listing?.locationRaw).toBe("Europe (+/- 3 hours); Remote");
+    expect(listing?.workMode).toBe("remote");
+  });
+
+  test("prefers hybrid workplaceType over isRemote", () => {
+    const listing = mapAshbyPostingToListing(
+      {
+        id: "abc12345",
+        title: "AI Research Engineer",
+        location: "Hybrid (UK)",
+        jobUrl: "https://jobs.ashbyhq.com/PostHog/abc12345",
+        isRemote: true,
+        workplaceType: "Hybrid",
+      },
+      "posthog",
+      "PostHog",
+    );
+    expect(listing?.locationRaw).toBe("Hybrid (UK)");
+    expect(listing?.workMode).toBe("hybrid");
+  });
+
+  test("falls back to isRemote when workplaceType is missing", () => {
+    const listing = mapAshbyPostingToListing(
+      {
+        id: "abc12345",
+        title: "Staff Engineer",
+        location: "United Kingdom",
+        jobUrl: "https://jobs.ashbyhq.com/tem/abc12345",
+        isRemote: true,
+      },
+      "tem",
+      "Tem",
+    );
+    expect(listing?.locationRaw).toBe("United Kingdom; Remote");
+    expect(listing?.workMode).toBe("remote");
+  });
+
+  test("adds Remote when the title marks a role remote", () => {
+    const listing = mapAshbyPostingToListing(
+      {
+        id: "abc12345",
+        title: "Senior Software Engineer (US Remote)",
+        location: "United States",
+        jobUrl: "https://jobs.ashbyhq.com/clickhouse/abc12345",
+      },
+      "clickhouse",
+      "ClickHouse",
+    );
+    expect(listing?.locationRaw).toBe("United States; Remote");
+    expect(listing?.workMode).toBe("remote");
+  });
+
   test("falls back to Remote with no locations", () => {
     const listing = mapAshbyPostingToListing(
       { id: "abc", title: "Engineer", jobUrl: "https://example.com/j" },
-      "roompricegenie",
-      "RoomPriceGenie",
+      "tem",
+      "Tem",
     );
     expect(listing?.locationRaw).toBe("Remote");
   });
 
   test("rejects postings missing id, title, or url", () => {
-    expect(mapAshbyPostingToListing({ title: "T", jobUrl: "https://example.com" }, "roompricegenie", "RPG")).toBeNull();
-    expect(mapAshbyPostingToListing({ id: "a", jobUrl: "https://example.com" }, "roompricegenie", "RPG")).toBeNull();
-    expect(mapAshbyPostingToListing({ id: "a", title: "T" }, "roompricegenie", "RPG")).toBeNull();
+    expect(mapAshbyPostingToListing({ title: "T", jobUrl: "https://example.com" }, "tem", "Tem")).toBeNull();
+    expect(mapAshbyPostingToListing({ id: "a", jobUrl: "https://example.com" }, "tem", "Tem")).toBeNull();
+    expect(mapAshbyPostingToListing({ id: "a", title: "T" }, "tem", "Tem")).toBeNull();
   });
 
   test("rejects unsafe urls", () => {
     expect(
-      mapAshbyPostingToListing({ id: "a", title: "T", jobUrl: "javascript:alert(1)" }, "roompricegenie", "RPG"),
+      mapAshbyPostingToListing({ id: "a", title: "T", jobUrl: "javascript:alert(1)" }, "tem", "Tem"),
     ).toBeNull();
   });
 });

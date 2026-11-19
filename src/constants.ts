@@ -12,7 +12,9 @@ export const DEFAULT_LOCATIONS: string[] = ["Dublin", "Wicklow", "Remote"];
 export const SOURCE_LABELS: Record<SourceId, string> = {
   publicjobs: "Publicjobs",
   activelink: "activelink",
-  roompricegenie: "RoomPriceGenie",
+  gitbook: "GitBook",
+  clickhouse: "ClickHouse",
+  posthog: "PostHog",
   pokemon: "Pokemon",
   drcc: "DRCC",
   rise: "RISE Counselling",

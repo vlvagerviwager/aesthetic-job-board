@@ -96,11 +96,11 @@ describe("matchesFilters", () => {
   }
 
   test("empty sources match every source", () => {
-    expect(matchesFilters(makeJob({ source: "roompricegenie" }), baseFilters(), {})).toBe(true);
+    expect(matchesFilters(makeJob({ source: "tem" }), baseFilters(), {})).toBe(true);
   });
 
   test("selected sources narrow the list", () => {
-    const filters = { ...baseFilters(), sources: ["activelink", "roompricegenie"] as BoardFilters["sources"] };
+    const filters = { ...baseFilters(), sources: ["activelink", "tem"] as BoardFilters["sources"] };
     expect(matchesFilters(makeJob({ source: "activelink" }), filters, {})).toBe(true);
     expect(matchesFilters(makeJob({ source: "publicjobs" }), filters, {})).toBe(false);
   });

@@ -12,10 +12,22 @@
     "notes": "No public JSON API found. Board is server rendered Drupal HTML. Build script parses article teasers at build time."
   },
   {
-    "id": "roompricegenie",
-    "label": "RoomPriceGenie",
-    "boardUrl": "https://roompricegenie.com/careers/#jobs",
-    "notes": "Ashby-hosted board. Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/roompricegenie)."
+    "id": "gitbook",
+    "label": "GitBook",
+    "boardUrl": "https://www.gitbook.com/careers#open-roles",
+    "notes": "Ashby-hosted board (GitBook). Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/gitbook)."
+  },
+  {
+    "id": "clickhouse",
+    "label": "ClickHouse",
+    "boardUrl": "https://clickhouse.com/company/careers#job-openings",
+    "notes": "Ashby-hosted board (clickhouse). Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/clickhouse)."
+  },
+  {
+    "id": "posthog",
+    "label": "PostHog",
+    "boardUrl": "https://posthog.com/careers",
+    "notes": "Ashby-hosted board (PostHog). Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/posthog)."
   },
   {
     "id": "pokemon",
