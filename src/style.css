@@ -416,6 +416,7 @@ body {
 .tag-source-gitbook { background: var(--color-lavender); color: var(--color-ink); }
 .tag-source-clickhouse { background: var(--color-yellow); color: var(--color-ink); }
 .tag-source-posthog { background: var(--color-pink); color: var(--color-navy); }
+.tag-source-spunout { background: var(--color-peach); color: var(--color-ink); }
 .tag-source-pokemon { background: var(--color-yellow); color: var(--color-navy); }
 .tag-source-drcc { background: var(--color-peach); color: var(--color-ink); }
 .tag-source-rise { background: var(--color-lavender); color: var(--color-ink); }
@@ -442,6 +443,7 @@ body {
 [data-theme="dark"] .tag-source-gitbook { background: var(--color-lavender); color: #1e2450; border-color: var(--color-lavender); }
 [data-theme="dark"] .tag-source-clickhouse { background: var(--color-yellow); color: #1e2450; border-color: var(--color-yellow); }
 [data-theme="dark"] .tag-source-posthog { background: var(--color-pink); color: #241f36; border-color: var(--color-pink); }
+[data-theme="dark"] .tag-source-spunout { background: var(--color-peach); color: #1e2450; border-color: var(--color-peach); }
 [data-theme="dark"] .tag-source-pokemon { background: var(--color-yellow); color: #1e2450; border-color: var(--color-yellow); }
 [data-theme="dark"] .tag-source-drcc { background: var(--color-peach); color: #1e2450; border-color: var(--color-peach); }
 [data-theme="dark"] .tag-source-rise { background: var(--color-lavender); color: #1e2450; border-color: var(--color-lavender); }

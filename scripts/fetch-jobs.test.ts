@@ -8,9 +8,12 @@ import {
   fetchReapListings,
   fetchUphealListings,
   mapAshbyPostingToListing,
+  mapBambooHrJobToListing,
   mapGreenhouseJobToListing,
   parseActivelinkDate,
   parseAwarePage,
+  parseBambooHrClosingDate,
+  parseBambooHrDate,
   parseDrccPage,
   parseIsoDateOrNow,
   parsePietaClosingDate,
@@ -255,6 +258,59 @@ describe("mapAshbyPostingToListing", () => {
   });
 });
 
+describe("BambooHR", () => {
+  const posting = {
+    id: "89",
+    jobOpeningName: "Junior Data Analyst",
+    departmentLabel: "Governance & Policy",
+    employmentStatusLabel: "Fixed-Term",
+    employmentType: null,
+    location: { city: "Dublin", state: "Dublin", addressCountry: "Ireland" },
+    jobOpeningShareUrl: "https://spunout.bamboohr.com/careers/89",
+    description:
+      "<p><strong>Location:</strong> Hybrid (Ireland) - requirement to attend the office (Dublin 7) for meetings/training as required</p><p>Application Closing Date : Midnight, Monday, 30th November 2026</p>",
+    compensation: " Internal Pay Grade: Officer Grade 1: €35,500 - €46,300 per annum ",
+    datePosted: "2026-11-20",
+  };
+
+  test("maps a BambooHR posting", () => {
+    const listing = mapBambooHrJobToListing(posting, "spunout", "SpunOut");
+    expect(listing?.id).toBe("spunout-89");
+    expect(listing?.locationRaw).toBe("Dublin, Ireland");
+    expect(listing?.summary).toBe("Governance & Policy · Fixed-Term");
+    expect(listing?.workMode).toBe("hybrid");
+    expect(listing?.salary).toContain("€35,500");
+    expect(listing?.postedDate).toBe("2026-11-20T09:00:00.000Z");
+    expect(listing?.closingDate).toBe("2026-11-30T09:00:00.000Z");
+  });
+
+  test("falls back to Ireland when no location is provided", () => {
+    const listing = mapBambooHrJobToListing(
+      { id: "90", jobOpeningName: "Analyst", jobOpeningShareUrl: "https://example.com/90" },
+      "spunout",
+      "SpunOut",
+    );
+    expect(listing?.locationRaw).toBe("Ireland");
+  });
+
+  test("rejects postings missing id, title, or url", () => {
+    expect(mapBambooHrJobToListing({ jobOpeningName: "A", jobOpeningShareUrl: "https://example.com" }, "spunout", "SpunOut")).toBeNull();
+    expect(mapBambooHrJobToListing({ id: "1", jobOpeningShareUrl: "https://example.com" }, "spunout", "SpunOut")).toBeNull();
+    expect(mapBambooHrJobToListing({ id: "1", jobOpeningName: "A" }, "spunout", "SpunOut")).toBeNull();
+  });
+
+  test("parses the labelled closing date", () => {
+    expect(parseBambooHrClosingDate("Application Closing Date : Midnight, Monday, 30th November 2026")).toBe(
+      "2026-11-30T09:00:00.000Z",
+    );
+    expect(parseBambooHrClosingDate("No deadline mentioned")).toBe("");
+  });
+
+  test("parses date-only posted dates at Dublin morning time", () => {
+    expect(parseBambooHrDate("2026-11-20")).toBe("2026-11-20T09:00:00.000Z");
+  });
+});
+
 describe("resolvePublicjobsUrl", () => {
   test("resolves relative hrefs against the board URL", () => {
     expect(resolvePublicjobsUrl("/opp/8550", "https://publicjobs.tal.net/board/")).toBe(
@@ -369,6 +425,14 @@ describe("fetchReapListings", () => {
     expect(jobs[0]?.title).toBe("Billing Analyst");
     expect(jobs[0]?.source).toBe("reap");
     expect(jobs[0]?.salary).toBe("€50,000 per annum");
+  });
+
+  test("returns an empty array when the feed has no items", async () => {
+    const jobs = await withMockedFetch(
+      () => new Response(JSON.stringify({ items: [] })),
+      () => fetchReapListings("https://careers.reap.global/jobs"),
+    );
+    expect(jobs).toHaveLength(0);
   });
 });
 

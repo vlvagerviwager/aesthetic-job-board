@@ -15,6 +15,7 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   gitbook: "GitBook",
   clickhouse: "ClickHouse",
   posthog: "PostHog",
+  spunout: "SpunOut",
   pokemon: "Pokemon",
   drcc: "DRCC",
   rise: "RISE Counselling",

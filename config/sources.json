@@ -30,6 +30,12 @@
     "notes": "Ashby-hosted board (PostHog). Build script reads the public Ashby posting API (api.ashbyhq.com/posting-api/job-board/posthog)."
   },
   {
+    "id": "spunout",
+    "label": "SpunOut",
+    "boardUrl": "https://spunout.bamboohr.com/careers",
+    "notes": "BambooHR-hosted board (SpunOut). Build script reads the public careers list API and each role's detail endpoint."
+  },
+  {
     "id": "pokemon",
     "label": "Pokemon",
     "boardUrl": "https://job-boards.greenhouse.io/pokemoncareers",

@@ -19,6 +19,7 @@ export const DEFAULT_BOARD_URLS: Record<SourceId, string> = {
   gitbook: "https://www.gitbook.com/careers#open-roles",
   clickhouse: "https://clickhouse.com/company/careers#job-openings",
   posthog: "https://posthog.com/careers",
+  spunout: "https://spunout.bamboohr.com/careers",
   pokemon: "https://job-boards.greenhouse.io/pokemoncareers",
   drcc: "https://www.drcc.ie/about/vacancies/",
   rise: "https://risecounselling.ie/vacancies/",
@@ -481,6 +482,147 @@ export async function fetchAshbyBoardListings(
   return collectedJobs;
 }
 
+const BAMBOOHR_LIST_PATH = "/careers/list";
+
+export interface BambooHrJobSummary {
+  id?: string;
+  jobOpeningName?: string;
+  departmentLabel?: string;
+  employmentStatusLabel?: string;
+  employmentType?: string | null;
+  location?: {
+    city?: string;
+    state?: string;
+    addressCountry?: string;
+  };
+}
+
+export interface BambooHrJobDetail extends BambooHrJobSummary {
+  jobOpeningShareUrl?: string;
+  description?: string;
+  compensation?: string;
+  datePosted?: string;
+}
+
+export function parseBambooHrDate(rawDate: string): string {
+  const trimmedDate = rawDate.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+    return parseIsoDateOrNow(`${trimmedDate}T09:00:00.000Z`);
+  }
+  return parseIsoDateOrNow(trimmedDate);
+}
+
+export function parseBambooHrClosingDate(descriptionText: string): string {
+  const closingMatch = descriptionText.match(/Application Closing Date\s*:?\s*([^.]{0,100})/i);
+  const dateMatch = closingMatch?.[1]?.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-z]+)\s*,?\s*(\d{4})/i);
+  if (dateMatch === null || dateMatch === undefined) {
+    return "";
+  }
+  return parsePublicjobsDate(`${dateMatch[1] ?? ""} ${dateMatch[2] ?? ""} ${dateMatch[3] ?? ""}`);
+}
+
+export function mapBambooHrJobToListing(
+  job: BambooHrJobDetail,
+  source: SourceId,
+  organisation: string,
+): JobListing | null {
+  const jobId = (job.id ?? "").trim();
+  const titleText = normalizeText(job.jobOpeningName);
+  const detailUrl = (job.jobOpeningShareUrl ?? "").trim();
+  if (jobId === "" || titleText === "" || detailUrl === "") {
+    return null;
+  }
+  const safeUrl = asSafeHttpUrl(detailUrl, "");
+  if (safeUrl === "") {
+    return null;
+  }
+  const locationParts: string[] = [];
+  for (const rawPart of [job.location?.city, job.location?.state, job.location?.addressCountry]) {
+    const locationPart = normalizeText(rawPart);
+    if (locationPart === "" || locationParts.some((existingPart) => existingPart.toLowerCase() === locationPart.toLowerCase())) {
+      continue;
+    }
+    locationParts.push(locationPart);
+  }
+  const locationRaw = locationParts.length > 0 ? locationParts.join(", ") : "Ireland";
+  const summaryParts: string[] = [];
+  for (const rawPart of [job.departmentLabel, job.employmentStatusLabel, job.employmentType]) {
+    const summaryPart = normalizeText(rawPart);
+    if (summaryPart !== "" && summaryParts.includes(summaryPart) === false) {
+      summaryParts.push(summaryPart);
+    }
+  }
+  const summaryText = summaryParts.join(" · ");
+  const descriptionText = stripHtmlTags(job.description ?? "");
+  const postedDate = parseBambooHrDate(job.datePosted ?? "");
+  const closingDate = parseBambooHrClosingDate(descriptionText) || postedDate;
+  const workMode = detectWorkMode(locationRaw, titleText, `${summaryText} ${descriptionText}`);
+  return buildJobListing({
+    id: `${source}-${jobId}`,
+    source,
+    title: titleText,
+    url: safeUrl,
+    organisation,
+    locationRaw,
+    summary: summaryText === "" ? organisation : summaryText,
+    salary: normalizeText(job.compensation),
+    postedDate,
+    closingDate,
+    workMode,
+  });
+}
+
+export async function fetchBambooHrListings(
+  source: SourceId,
+  organisation: string,
+  boardUrl: string,
+): Promise<JobListing[]> {
+  const boardOrigin = new URL(boardUrl).origin;
+  const listUrl = `${boardOrigin}${BAMBOOHR_LIST_PATH}`;
+  console.log(`Fetching ${source} jobs from BambooHR API`);
+  const listResponseText = await fetchTextWithTimeout(listUrl);
+  let listPayload: { result?: BambooHrJobSummary[] };
+  try {
+    listPayload = JSON.parse(listResponseText) as typeof listPayload;
+  } catch {
+    throw new Error(`BambooHR API for ${source} did not return JSON (${listUrl}). The board may have moved; check ${boardUrl}.`);
+  }
+  if (Array.isArray(listPayload.result) === false) {
+    throw new Error(`BambooHR API for ${source} returned no job list (${listUrl}).`);
+  }
+  const collectedJobs: JobListing[] = [];
+  for (const summary of listPayload.result) {
+    if (collectedJobs.length >= MAX_JOBS_PER_SOURCE) {
+      break;
+    }
+    const jobId = (summary.id ?? "").trim();
+    if (jobId === "") {
+      continue;
+    }
+    try {
+      const detailUrl = `${boardOrigin}/careers/${jobId}/detail`;
+      const detailResponseText = await fetchTextWithTimeout(detailUrl);
+      const detailPayload = JSON.parse(detailResponseText) as { result?: { jobOpening?: BambooHrJobDetail } };
+      const jobDetail = detailPayload.result?.jobOpening;
+      if (jobDetail === undefined) {
+        console.warn(`BambooHR detail missing for ${source} job ${jobId}, skipping.`);
+        continue;
+      }
+      const listing = mapBambooHrJobToListing({ ...summary, ...jobDetail, id: jobId }, source, organisation);
+      if (listing !== null) {
+        collectedJobs.push(listing);
+      }
+    } catch (error) {
+      console.warn(`Could not fetch BambooHR details for ${source} job ${jobId}, skipping.`, error);
+    }
+    await sleepMilliseconds(DELAY_BETWEEN_PAGES_MS);
+  }
+  if (collectedJobs.length === 0) {
+    console.log(`BambooHR board for ${source} returned no usable listings (${listUrl}).`);
+  }
+  return collectedJobs;
+}
+
 const GREENHOUSE_API_URL = "https://boards-api.greenhouse.io/v1/boards";
 
 export interface GreenhouseJob {
@@ -824,8 +966,12 @@ export async function fetchReapListings(boardUrl: string): Promise<JobListing[]>
   } catch {
     throw new Error(`Reap API did not return JSON (${apiUrl}). The feed may have moved; check ${boardUrl}.`);
   }
-  if (Array.isArray(payload.items) === false || payload.items.length === 0) {
-    throw new Error(`Reap API returned no items (${apiUrl}).`);
+  if (Array.isArray(payload.items) === false) {
+    throw new Error(`Reap API returned no job list (${apiUrl}).`);
+  }
+  if (payload.items.length === 0) {
+    console.log(`Reap API returned no current openings (${apiUrl}).`);
+    return [];
   }
   const collectedJobs: JobListing[] = [];
   for (const item of payload.items) {
@@ -1240,6 +1386,10 @@ const SOURCE_REGISTRY: Record<SourceId, SourceDefinition> = {
   posthog: {
     label: "PostHog",
     fetchJobs: ({ boardUrls }) => fetchAshbyBoardListings("posthog", "PostHog", boardUrls.posthog),
+  },
+  spunout: {
+    label: "SpunOut",
+    fetchJobs: ({ boardUrls }) => fetchBambooHrListings("spunout", "SpunOut", boardUrls.spunout),
   },
   pokemon: {
     label: "Pokemon",
